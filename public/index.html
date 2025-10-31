@@ -14,19 +14,23 @@
     tr:not(:first-child){border-top:1px solid rgba(255,255,255,0.06)}
 
     /* Status Pills */
-    .status{font-weight:600;padding:6px 10px;border-radius:6px;display:inline-block}
+    .status{font-weight:600;padding:6px 10px;border-radius:999px;display:inline-block}
     .status.notpicked{background:#6b1f1f;color:#ffecec}
     .status.preparing{background:#6b4d1f;color:#fff8e0}
     .status.ready{background:#1e4f2d;color:#ffffff;animation:pulse 1.8s infinite;box-shadow:0 0 8px rgba(0,255,0,0.4)}
-    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(1.05)}}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.8;transform:scale(1.05)}}
 
     /* Asset pills */
-    .asset-pill{display:inline-block;border-radius:6px;padding:4px 8px;margin:2px;font-weight:600;color:#e6eef8}
-    .asset-video{background-color:rgba(128,0,128,0.25)}
+    .asset-pill{display:inline-block;border-radius:8px;padding:6px 10px;margin:3px 4px 0 0;font-weight:600;color:#e6eef8}
+
+    /* Updated, more distinct colours */
+    .asset-video{background-color:rgba(178,102,255,0.35)} /* Brighter purple */
     .asset-sound{background-color:rgba(255,0,0,0.25)}
-    .asset-lighting{background-color:rgba(255,235,59,0.45);color:#fff}
-    .asset-grip{background-color:rgba(128,128,128,0.25)}
+    .asset-lighting{background-color:rgba(255,235,59,0.55);color:#ffffff}
+    .asset-grip{background-color:rgba(0,123,255,0.28);color:#eaf2ff}
     .asset-uncategorised,.asset-uncategorized{background-color:rgba(128,128,128,0.25)}
+
+    .legend{font-size:12px;opacity:.9;margin-bottom:8px}
   </style>
 </head>
 <body>
@@ -39,7 +43,7 @@
   </header>
 
   <main style="padding:16px">
-    <div style="font-size:12px;opacity:.8;margin-bottom:8px">
+    <div class="legend">
       <span class="asset-pill asset-video">Video</span>
       <span class="asset-pill asset-sound">Sound</span>
       <span class="asset-pill asset-lighting">Lighting</span>
@@ -50,28 +54,15 @@
   </main>
 
   <script>
-    /* ---------- Robust client-side category normalization ---------- */
     function normalizeCategory(rawCategory, assetName){
       const s=(rawCategory||'').toString().toLowerCase();
       const n=(assetName||'').toString().toLowerCase();
-      const has = (w)=> s.includes(w)||n.includes(w);
-
-      // VIDEO
-      if (has('video')||has('camera')||has('cam')||has('lens')||has('sony fx')||has('a7')||has('a6000')||has('a7iv')||has('fs')||has('xavc')||s==='video') {
-        return 'video';
-      }
-      // SOUND
-      if (has('audio')||has('sound')||has('mic')||has('microphone')||has('rode')||has('ntg')||has('shotgun')||has('zoom h')||has('tascam')||s==='sound') {
-        return 'sound';
-      }
-      // LIGHTING
-      if (has('light')||has('aputure')||has('amaran')||has('nanlite')||has('godox')||has('led')||s==='lighting') {
-        return 'lighting';
-      }
-      // GRIP / SUPPORT
-      if (has('tripod')||has('sachtler')||has('manfrotto')||has('head')||has('rig')||has('smallrig')||has('stand')||has('c-stand')||has('arm')||has('clamp')||s==='grip') {
-        return 'grip';
-      }
+      const has=(w)=>s.includes(w)||n.includes(w);
+      if (['video','sound','lighting','grip','uncategorised','uncategorized'].includes(s)) return s;
+      if (has('camera')||has('lens')||has('a7')||has('fx')||has('fs')) return 'video';
+      if (has('mic')||has('microphone')||has('rode')||has('ntg')||has('shotgun')||has('zoom h')||has('tascam')) return 'sound';
+      if (has('light')||has('aputure')||has('amaran')||has('nanlite')||has('godox')||has('led')) return 'lighting';
+      if (has('tripod')||has('sachtler')||has('manfrotto')||has('smallrig')||has('stand')||has('c-stand')||has('arm')||has('clamp')) return 'grip';
       return 'uncategorised';
     }
 
@@ -84,7 +75,6 @@
     function formatTime(dt){if(!dt)return'';const d=new Date(dt);return isNaN(d)?dt:d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
 
     function renderAssets(assets){
-      // assets may be strings or objects {name, category}
       return (assets||[]).map(a=>{
         const name = typeof a==='string'?a:(a.name||'');
         const rawCat = typeof a==='string'?'':(a.category||'');

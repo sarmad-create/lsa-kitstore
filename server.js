@@ -14,40 +14,168 @@ app.use('/', express.static(path.join(__dirname, 'public')));
 const BASE_URL   = process.env.SISO_BASE_URL || 'https://lsa.siso.co';
 const AUTH_TOKEN = process.env.SISO_AUTH_TOKEN || 'L2Mwz8gUdd';
 const AUTH_KEY   = process.env.SISO_AUTH_KEY   || '13b3dc30-971c-440a-81ee-4f99026d44e7';
-const STATUS_FILE = path.join(__dirname, 'statuses.json');
-const CATEGORY_OVERRIDES_FILE = path.join(__dirname, 'categories.json');
+
+const STATUS_FILE              = path.join(__dirname, 'statuses.json');       // tech overrides for booking status
+const CATEGORY_OVERRIDES_FILE  = path.join(__dirname, 'categories.json');     // per-asset manual category override
+const LISTS_FILE               = path.join(__dirname, 'lists.json');          // curated category name lists
 
 if (!AUTH_TOKEN || !AUTH_KEY) {
   console.error('❌ Missing SISO_AUTH_TOKEN or SISO_AUTH_KEY in .env');
   process.exit(1);
 }
 
-// ---------- persisted category overrides ----------
-async function readCategoryOverrides() {
-  try {
-    const raw = await fs.readFile(CATEGORY_OVERRIDES_FILE, 'utf8');
-    return JSON.parse(raw || '{}');
-  } catch (e) {
-    if (e.code === 'ENOENT') return {};
-    console.error('Error reading categories.json', e);
-    return {};
+/* --------------------------
+   Basic Auth for tech routes
+   -------------------------- */
+const TECH_PASSWORD = process.env.TECH_PASSWORD || 'tech123'; // change in .env
+
+function techAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Basic ')) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Technician Area"');
+    return res.status(401).send('Authentication required.');
   }
-}
-async function writeCategoryOverrides(map) {
+  const base64 = authHeader.split(' ')[1];
+  let user = '', pass = '';
   try {
-    await fs.writeFile(CATEGORY_OVERRIDES_FILE, JSON.stringify(map, null, 2), 'utf8');
-  } catch (e) {
-    console.error('Error writing categories.json', e);
+    [user, pass] = Buffer.from(base64, 'base64').toString().split(':');
+  } catch {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Technician Area"');
+    return res.status(401).send('Invalid auth.');
   }
-}
-function normalizeNameKey(name) {
-  return (name || '').toString().trim().toLowerCase();
+  if (pass === TECH_PASSWORD) return next();
+  res.setHeader('WWW-Authenticate', 'Basic realm="Technician Area"');
+  return res.status(401).send('Access denied.');
 }
 
-// ---------- JWT cache ----------
+/* --------------------------
+   File helpers (JSON)
+   -------------------------- */
+async function readJson(file, fallbackObj) {
+  try {
+    const raw = await fs.readFile(file, 'utf8');
+    return JSON.parse(raw || 'null') ?? fallbackObj;
+  } catch (e) {
+    if (e.code === 'ENOENT' && typeof fallbackObj !== 'undefined') {
+      await fs.writeFile(file, JSON.stringify(fallbackObj, null, 2), 'utf8');
+      return fallbackObj;
+    }
+    console.error(`Error reading ${path.basename(file)}`, e);
+    return fallbackObj ?? {};
+  }
+}
+async function writeJson(file, obj) {
+  await fs.writeFile(file, JSON.stringify(obj, null, 2), 'utf8');
+}
+
+/* --------------------------
+   categories.json (per-asset overrides)
+   -------------------------- */
+async function readCategoryOverrides() { return readJson(CATEGORY_OVERRIDES_FILE, {}); }
+async function writeCategoryOverrides(map) { return writeJson(CATEGORY_OVERRIDES_FILE, map); }
+function normalizeNameKey(name) { return (name || '').toString().trim().toLowerCase(); }
+
+/* --------------------------
+   lists.json (curated name lists)
+   -------------------------- */
+const DEFAULT_LISTS = {
+  grip: [
+    "C-Stand","DJI Ronin S","DJI RS 3","DJI RS 4","DJI RS4 PRO COMBO  Gimbal Stabiliser",
+    "Easyrig","iFootage Slider","Libec Tripod","Manfrotto Autopole","Manfrotto Monopod",
+    "Sachtler Tripods","Slider","SmallRig FreeBlazer Tripod","SmallRig Shoulder Rig","SmallRig Tripod"
+  ],
+  video: [
+    "12-24mm",'12" SWIT Monitor',"28-135mm","28mm","35mm","50mm","A6000","A7IV","A7IV + Cage","A7SIII",
+    "Anamorphic Blazer Lens kit",'BlackMagic 5" Monitor','BlackMagic 7" Monitor',"Bolex H16 Camera",
+    "Clapperboard","Cooke S4 Lens kit (18-40mm)","Cooke S4 Lens kit (55-100mm)","Director's Monitor",
+    "DJI Focus Pro","Fisheye Lens 7.5mm","G-MASTER 24-70mm","GM - FE 2.8/12-24 - Sony Lens",
+    "Go Pro Hero10",'Monitor SmallHD Cine 13" Production Monitor',"ND Filters 49mm","ND Filters 55mm",
+    "ND Filters 77mm","SAMYANG Lenses","Sirui Nightwalker Lens Set","Sony A7SII","Sony FE 24-105mm F4",
+    "Sony FE 24-70mm F4","Sony FE 28-70mm F4","Sony FX30","Sony FX6 - Alumni Only","Sony FX9",
+    "Sony NX 200 Camcorders","Swit 5.5' monitor","Tilta Nucleus Nano II","VAXIS","XEEN CF Lenses","ZV-E10 II"
+  ],
+  lighting: [
+    "Amaran 200D","Amaran P60X Light","Amaran Tube Lights PT4C","Aputure Nova P300","Cambees Light Panels",
+    "Dedo Boxes","LitePanels x3","Neewer LightPanel","Reflector","Sky Panel Lights","SmallRig M160",
+    "Smallrig RC120B","Smallrig RC60B + Parabolic Softbox","Sony Top Shoe Light","Storm 80c"
+  ],
+  sound: [
+    "4 Way Splitter","AKG Harman, C414 XLII","ALUMNI ONLY - Sony Radio Mic Set + XLR Transmitter",
+    "Blimp mic w/ Dead cat","Boom pole","DJI Mic 1","DJI Mic 2","Headphones","K-TEK INDIE Cabled Boom Pole",
+    "Long XLR (FtM)","RODECaster Pro II","RODE NTG-1","RODE NTH Headphones","Rode Pistol Grip",
+    "Rode Top Shoe Video Mic","Short XLR (FtM)","SHURE SM58 Dynamic Microphone","Sony ECM Mic",
+    "Sony Radio Boom Mic Receiver + Transmiter","Sony Radio Mic Kit","TONOR Wireless Smartphone Mic",
+    "Zoom F6","Zoom H5","Zoom Mic Podcast Pack"
+  ]
+};
+async function readLists() { return readJson(LISTS_FILE, DEFAULT_LISTS); }
+async function writeLists(lists) { return writeJson(LISTS_FILE, lists); }
+
+/* --------------------------
+   Normalization & matching
+   -------------------------- */
+function norm(s) {
+  return (s || '')
+    .toString()
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u201C\u201D]/g, "'")
+    .replace(/[^\p{L}\p{N}\s'"-]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function buildSetsFromLists(lists) {
+  const toSet = arr => new Set((arr || []).map(norm));
+  return {
+    gripSet: toSet(lists.grip),
+    videoSet: toSet(lists.video),
+    lightingSet: toSet(lists.lighting),
+    soundSet: toSet(lists.sound),
+  };
+}
+function categoryFromProvidedLists(assetName, sets) {
+  const n = norm(assetName);
+  if (!n) return null;
+  const { gripSet, videoSet, lightingSet, soundSet } = sets;
+
+  if (gripSet.has(n)) return 'grip';
+  if (videoSet.has(n)) return 'video';
+  if (lightingSet.has(n)) return 'lighting';
+  if (soundSet.has(n)) return 'sound';
+
+  for (const v of gripSet)     { if (v && n.includes(v)) return 'grip'; }
+  for (const v of videoSet)    { if (v && n.includes(v)) return 'video'; }
+  for (const v of lightingSet) { if (v && n.includes(v)) return 'lighting'; }
+  for (const v of soundSet)    { if (v && n.includes(v)) return 'sound'; }
+
+  return null;
+}
+function strongLightingByName(assetName) {
+  const n = norm(assetName);
+  const patterns = [
+    /\brm[-\s]?120b?\b/i,
+    /\brm[-\s]?75b?\b/i,
+    /\bpocket\s*light\b/i,
+    /\bmini\s*led\b/i,
+    /\bled\s*panel\b/i,
+  ];
+  return patterns.some(rx => rx.test(n)) || (n.includes('smallrig') && n.includes('rm'));
+}
+const CATEGORY_SYNONYMS = {
+  video:     ['video', 'camera', 'cameras', 'lens', 'lenses', 'optics'],
+  sound:     ['sound', 'audio', 'microphone', 'microphones', 'mic', 'mics', 'recorder', 'recorders'],
+  lighting:  ['lighting', 'light', 'lights', 'illumination', 'fixture', 'fixtures'],
+  grip:      ['grip', 'support', 'rigging', 'stand', 'stands', 'tripod', 'tripods']
+};
+function anyMatchesBucket(candidates, bucket) {
+  const syns = CATEGORY_SYNONYMS[bucket];
+  return candidates.some(c => syns.some(s => c === s || c.includes(s)));
+}
+
+/* --------------------------
+   JWT cache
+   -------------------------- */
 let cachedJwt = null;
 let jwtExpiry = 0;
-
 async function getJwt() {
   const now = Date.now();
   if (cachedJwt && now < jwtExpiry - 3000) return cachedJwt;
@@ -69,14 +197,15 @@ async function getJwt() {
   return cachedJwt;
 }
 
-// ---------- helpers ----------
+/* --------------------------
+   Date & grouping helpers
+   -------------------------- */
 function formatDateForApi(dateObj) {
   const dd = String(dateObj.getDate()).padStart(2, '0');
   const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
   const yyyy = dateObj.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
 }
-
 function parseStartDateParts(startdatetime) {
   if (!startdatetime) return null;
   const s = String(startdatetime);
@@ -96,13 +225,11 @@ function parseStartDateParts(startdatetime) {
   if (!isNaN(dt)) return { d: dt.getDate(), m: dt.getMonth() + 1, y: dt.getFullYear() };
   return null;
 }
-
 function isSameDayStart(startdatetime, day) {
   const p = parseStartDateParts(startdatetime);
   if (!p) return false;
   return p.y === day.getFullYear() && p.m === (day.getMonth() + 1) && p.d === day.getDate();
 }
-
 function getTimeBucket(datetimeString, minutes = 5) {
   if (!datetimeString) return 'Unknown';
   const raw = String(datetimeString);
@@ -120,105 +247,85 @@ function getTimeBucket(datetimeString, minutes = 5) {
   const bucketTime = new Date(Math.floor(d.getTime() / ms) * ms);
   return bucketTime.toISOString();
 }
-
 function makeGroupKey(username, startdatetime) {
   return `${(username || 'Unknown').trim()}_${(startdatetime || 'Unknown').trim()}`;
 }
 
-// ---------- category logic ----------
-const BUCKETS = ['video', 'sound', 'lighting', 'grip'];
-const CATEGORY_SYNONYMS = {
-  video:     ['video', 'camera', 'cameras', 'lens', 'lenses', 'optics'],
-  sound:     ['sound', 'audio', 'microphone', 'microphones', 'mic', 'mics', 'recorder', 'recorders'],
-  lighting:  ['lighting', 'light', 'lights', 'illumination', 'fixture', 'fixtures'],
-  grip:      ['grip', 'support', 'rigging', 'stand', 'stands', 'tripod', 'tripods']
-};
-function anyMatchesBucket(candidates, bucket) {
-  const syns = CATEGORY_SYNONYMS[bucket];
-  return candidates.some(c => syns.some(s => c === s || c.includes(s)));
-}
+/* --------------------------
+   Status file helpers
+   -------------------------- */
+async function readStatuses() { return readJson(STATUS_FILE, {}); }
+async function writeStatuses(obj) { return writeJson(STATUS_FILE, obj); }
 
-// NEW: strong Lighting name signal (applies BEFORE trusting "Grip" candidates)
-function strongLightingByName(assetName) {
-  const n = (assetName || '').toString().toLowerCase();
-  // SmallRig RM lights & common pocket lights
-  const patterns = [
-    /\brm[-\s]?120b?\b/,
-    /\brm[-\s]?75b?\b/,
-    /\bpocket\s*light\b/,
-    /\bmini\s*led\b/,
-    /\bled\s*panel\b/,
-  ];
-  return patterns.some(rx => rx.test(n)) || (n.includes('smallrig') && n.includes('rm'));
-}
+/* --------------------------
+   Category decision priority
+   1) categories.json override
+   2) lists.json (your curated lists)
+   3) strong lighting by name
+   4) SISO fields (lighting→video→sound→grip)
+   5) generic name heuristic
+   -------------------------- */
+function decideCategory(row, assetName, overridesMap, sets) {
+  const override = (overridesMap || {})[normalizeNameKey(assetName)];
+  if (override && ['video','sound','lighting','grip','uncategorised'].includes(override)) return override;
 
-function decideCategoryFromSisoFields(row, assetName, overridesMap) {
-  // 0) explicit override by exact name
-  const override = overridesMap[normalizeNameKey(assetName)];
-  if (override && BUCKETS.includes(override)) return override;
+  const fromLists = categoryFromProvidedLists(assetName, sets);
+  if (fromLists) return fromLists;
 
-  // 1) STRONG NAME HINT for lighting (beats a misleading 'Grip' candidate)
   if (strongLightingByName(assetName)) return 'lighting';
 
-  // 2) aggregate SISO candidates
   const rawCandidates = [
-    row.assetcategoryname,
-    row.categoryname,
-    row.assetcategory,
-    row.category,
-    row.assettypecategory,
-    row.groupname,
-    row.department,
-    row.parentcategory,
-    row.subcategory
-  ];
-  const candidates = rawCandidates
-    .map(v => (v == null ? '' : String(v).trim().toLowerCase()))
-    .filter(v => v.length > 0);
+    row.assetcategoryname, row.categoryname, row.assetcategory, row.category,
+    row.assettypecategory, row.groupname, row.department, row.parentcategory, row.subcategory
+  ].map(v => (v == null ? '' : String(v).trim().toLowerCase())).filter(Boolean);
 
-  // 3) choose by bucket priority Lighting → Video → Sound → Grip
-  if (anyMatchesBucket(candidates, 'lighting')) return 'lighting';
-  if (anyMatchesBucket(candidates, 'video'))    return 'video';
-  if (anyMatchesBucket(candidates, 'sound'))    return 'sound';
-  if (anyMatchesBucket(candidates, 'grip'))     return 'grip';
+  if (anyMatchesBucket(rawCandidates, 'lighting')) return 'lighting';
+  if (anyMatchesBucket(rawCandidates, 'video'))    return 'video';
+  if (anyMatchesBucket(rawCandidates, 'sound'))    return 'sound';
+  if (anyMatchesBucket(rawCandidates, 'grip'))     return 'grip';
 
-  // 4) general name heuristic (last resort)
-  const n = (assetName || '').toString().toLowerCase();
-  if (/(camera|lens|a7|fx|fs|a6000)/.test(n)) return 'video';
-  if (/(mic|microphone|rode|ntg|shotgun|zoom h|tascam)/.test(n)) return 'sound';
-  if (/(light|aputure|amaran|nanlite|godox|led)/.test(n)) return 'lighting';
-  if (/(tripod|sachtler|manfrotto|smallrig|stand|c-stand|arm|clamp)/.test(n)) return 'grip';
-
+  const n = norm(assetName);
+  if (/(camera|lens|a7|fx|fs|a6000)/i.test(n)) return 'video';
+  if (/(mic|microphone|rode|ntg|shotgun|zoom h|tascam)/i.test(n)) return 'sound';
+  if (/(light|aputure|amaran|nanlite|godox|led)/i.test(n)) return 'lighting';
+  if (/(tripod|sachtler|manfrotto|smallrig|stand|c-stand|arm|clamp)/i.test(n)) return 'grip';
   return 'uncategorised';
 }
 
-// ---------- statuses.json helpers ----------
-async function readStatuses() {
-  try {
-    const raw = await fs.readFile(STATUS_FILE, 'utf8');
-    return JSON.parse(raw || '{}');
-  } catch (err) {
-    if (err.code === 'ENOENT') return {};
-    console.error('Error reading statuses.json', err);
-    return {};
-  }
-}
-async function writeStatuses(obj) {
-  try {
-    await fs.writeFile(STATUS_FILE, JSON.stringify(obj, null, 2), 'utf8');
-  } catch (err) {
-    console.error('Error writing statuses.json', err);
-  }
-}
+/* --------------------------
+   Routes
+   -------------------------- */
 
-// ---------- routes ----------
-app.get('/tech', (req, res) => {
+// Secure the technician dashboard page
+app.get('/tech', techAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'tech.html'));
 });
 
-// Optional: set a permanent category override by asset name
-// body: { assetName: "SmallRig RM120", category: "lighting" }
-app.post('/api/category-override', async (req, res) => {
+// Public: view lists.json
+app.get('/api/lists', async (_req, res) => {
+  const lists = await readLists();
+  res.json({ success: true, lists });
+});
+
+// Secure: update lists.json
+app.post('/api/lists', techAuth, async (req, res) => {
+  try {
+    const incoming = req.body || {};
+    const lists = await readLists();
+    const keys = ['grip','video','lighting','sound'];
+    for (const k of keys) {
+      if (Array.isArray(incoming[k])) lists[k] = incoming[k].map(v => String(v));
+    }
+    await writeLists(lists);
+    res.json({ success: true, lists });
+  } catch (e) {
+    console.error('Error /api/lists', e);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// Secure: manual category override
+app.post('/api/category-override', techAuth, async (req, res) => {
   try {
     const { assetName, category } = req.body || {};
     if (!assetName || !category) {
@@ -238,15 +345,14 @@ app.post('/api/category-override', async (req, res) => {
     res.status(500).json({ success: false, error: e.message });
   }
 });
-
 app.get('/api/category-override', async (_req, res) => {
   const map = await readCategoryOverrides();
   res.json({ success: true, overrides: map });
 });
 
+// Public: bookings for today
 app.get('/api/bookings', async (req, res) => {
   try {
-    const debug = String(req.query.debug || '0') === '1';
     const today = new Date();
     const apiDate = formatDateForApi(today);
     const jwt = await getJwt();
@@ -264,50 +370,37 @@ app.get('/api/bookings', async (req, res) => {
 
     let rows = response?.data?.response || [];
 
-    // only actual bookings
+    // Only real bookings
     rows = rows.filter(r =>
       r.currentstatus &&
       !String(r.currentstatus).toLowerCase().includes('booking request')
     );
 
-    // only today's
+    // Only today's date
     rows = rows.filter(r => isSameDayStart(r.startdatetime, today));
 
     const overridesMap = await readCategoryOverrides();
+    const lists = await readLists();
+    const sets = buildSetsFromLists(lists);
 
-    // group by user + time bucket
+    // Group by user + 5-min time bucket
     const grouped = {};
     for (const r of rows) {
       const username = (r.username || r.userbarcode || 'Unknown').trim();
       const bucket = getTimeBucket(r.startdatetime, 5);
       const key = makeGroupKey(username, bucket);
 
-      const cat = decideCategoryFromSisoFields(r, r.assetname, overridesMap);
+      const decidedCat = decideCategory(r, r.assetname, overridesMap, sets);
 
       if (!grouped[key]) {
-        grouped[key] = { username, startdatetime: bucket, assets: [], statuses: [], debugRows: debug ? [] : undefined };
+        grouped[key] = { username, startdatetime: bucket, assets: [], statuses: [] };
       }
-      grouped[key].assets.push({ name: r.assetname, category: cat });
+      grouped[key].assets.push({ name: r.assetname, category: decidedCat });
       grouped[key].statuses.push(String(r.currentstatus).toLowerCase());
-
-      if (debug) {
-        const cands = {
-          assetcategoryname: r.assetcategoryname ?? null,
-          categoryname:      r.categoryname ?? null,
-          assetcategory:     r.assetcategory ?? null,
-          category:          r.category ?? null,
-          assettypecategory: r.assettypecategory ?? null,
-          groupname:         r.groupname ?? null,
-          department:        r.department ?? null,
-          parentcategory:    r.parentcategory ?? null,
-          subcategory:       r.subcategory ?? null
-        };
-        grouped[key].debugRows.push({ assetname: r.assetname, candidates: cands, decided: cat });
-      }
     }
 
-    const overrides = await readStatuses();
-
+    // compute status + apply tech overrides
+    const techOverrides = await readStatuses();
     const bookings = Object.values(grouped).map(g => {
       const pickedKeywords = ['picked', 'ready', 'collected', 'complete', 'completed', 'returned', 'issued'];
       const pickedOrReady = g.statuses.filter(s => pickedKeywords.some(k => s.includes(k))).length;
@@ -319,22 +412,20 @@ app.get('/api/bookings', async (req, res) => {
       else autoStatus = 'Ready for Collection';
 
       const key = makeGroupKey(g.username, g.startdatetime);
-      if (overrides[key]) {
-        const o = String(overrides[key]).toLowerCase();
+      if (techOverrides[key]) {
+        const o = String(techOverrides[key]).toLowerCase();
         if (o === 'preparing') autoStatus = 'Preparing';
         else if (o === 'ready') autoStatus = 'Ready for Collection';
         else if (o === 'notpicked' || o === 'not picked') autoStatus = 'Not Picked';
       }
 
-      const out = {
+      return {
         username: g.username,
         startdatetime: g.startdatetime,
-        assets: g.assets,
+        assets: g.assets, // [{ name, category }]
         status: autoStatus,
         _groupKey: key
       };
-      if (g.debugRows) out._debug = g.debugRows;
-      return out;
     });
 
     res.json({ success: true, bookings });
@@ -344,8 +435,8 @@ app.get('/api/bookings', async (req, res) => {
   }
 });
 
-// tech status buttons
-app.post('/api/update-status', async (req, res) => {
+// Secure: tech status override (buttons)
+app.post('/api/update-status', techAuth, async (req, res) => {
   try {
     const { key, status } = req.body;
     if (!key || !status) return res.status(400).json({ success: false, error: 'Missing key or status' });
@@ -366,14 +457,17 @@ app.post('/api/update-status', async (req, res) => {
   }
 });
 
-// debug: tech overrides
+// Debug: see tech overrides
 app.get('/api/overrides', async (_req, res) => {
   const statuses = await readStatuses();
   res.json({ success: true, overrides: statuses });
 });
 
-// start
+/* --------------------------
+   Start server
+   -------------------------- */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ SISO dashboard backend running at http://localhost:${PORT}`);
+  console.log('🔐 TECH_PASSWORD protection active on /tech and tech-only APIs');
 });
