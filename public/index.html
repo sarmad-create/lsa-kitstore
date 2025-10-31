@@ -13,24 +13,29 @@
     th,td{padding:12px;text-align:left;vertical-align:top}
     tr:not(:first-child){border-top:1px solid rgba(255,255,255,0.06)}
 
-    /* Status Pills */
-    .status{font-weight:600;padding:6px 10px;border-radius:999px;display:inline-block}
+    /* Status pills - squarish shape */
+    .status{font-weight:600;padding:6px 12px;border-radius:8px;display:inline-block}
     .status.notpicked{background:#6b1f1f;color:#ffecec}
     .status.preparing{background:#6b4d1f;color:#fff8e0}
-    .status.ready{background:#1e4f2d;color:#ffffff;animation:pulse 1.8s infinite;box-shadow:0 0 8px rgba(0,255,0,0.4)}
-    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.8;transform:scale(1.05)}}
+    .status.ready{
+      background:#1e4f2d;color:#ffffff;
+      /* Smooth, seamless pulse with alternate direction (no snap) */
+      animation: readyGlow 2.8s ease-in-out infinite alternate;
+    }
+    @keyframes readyGlow{
+      from { transform:scale(1);   box-shadow:0 0 0 rgba(0,255,120,0.00); }
+      to   { transform:scale(1.03);box-shadow:0 0 20px rgba(0,255,120,0.40); }
+    }
 
     /* Asset pills */
-    .asset-pill{display:inline-block;border-radius:8px;padding:6px 10px;margin:3px 4px 0 0;font-weight:600;color:#e6eef8}
+    .asset-pill{display:inline-block;border-radius:8px;padding:6px 10px;margin:3px 4px 0 0;font-weight:600}
+    .asset-video{background-color:rgba(128,0,128,0.25); color:#efe8ff}
+    .asset-sound{background-color:rgba(200,50,50,0.25); color:#ffecec} /* darker red */
+    .asset-lighting{background-color:rgba(255,235,59,0.45); color:#ffffff}
+    .asset-grip{background-color:rgba(0,123,255,0.28); color:#eaf2ff}
+    .asset-uncategorised,.asset-uncategorized{background-color:rgba(200,200,200,0.18); color:#e6eef8}
 
-    /* Updated, more distinct colours */
-    .asset-video{background-color:rgba(178,102,255,0.35)} /* Brighter purple */
-    .asset-sound{background-color:rgba(255,0,0,0.25)}
-    .asset-lighting{background-color:rgba(255,235,59,0.55);color:#ffffff}
-    .asset-grip{background-color:rgba(0,123,255,0.28);color:#eaf2ff}
-    .asset-uncategorised,.asset-uncategorized{background-color:rgba(128,128,128,0.25)}
-
-    .legend{font-size:12px;opacity:.9;margin-bottom:8px}
+    .legend{font-size:12px;opacity:.95;margin-bottom:8px}
   </style>
 </head>
 <body>
@@ -66,6 +71,14 @@
       return 'uncategorised';
     }
 
+    function statusClass(status){
+      const t=(status||'').toLowerCase();
+      if (t.includes('ready')) return 'ready';
+      if (t.includes('prepar')) return 'preparing';
+      if (t.includes('not')) return 'notpicked';
+      return t.replace(/\s+/g,'');
+    }
+
     let bookings=[],page=0;const pageSize=8;let rotateTimer=null;
     const pageInfo=document.getElementById('pageInfo'),tableWrap=document.getElementById('tableWrap'),clockEl=document.getElementById('clock');
 
@@ -96,11 +109,11 @@
       }else{
         for(const b of pageBookings){
           const time=formatTime(b.startdatetime);
-          const stClass=b.status.toLowerCase().replace(/\s+/g,'');
+          const cls=statusClass(b.status);
           html += `<tr>
             <td>${time}</td>
             <td>${b.username}</td>
-            <td><span class="status ${stClass}">${b.status}</span></td>
+            <td><span class="status ${cls}">${b.status}</span></td>
             <td>${renderAssets(b.assets)}</td>
           </tr>`;
         }

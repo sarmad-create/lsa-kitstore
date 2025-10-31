@@ -6,35 +6,50 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;background:#1a1024;color:#f0e6ff}
-    header{padding:16px;background:#2c1952;display:flex;justify-content:space-between;align-items:center}
+    header{padding:16px;background:#2c1952;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
     h1{margin:0;font-size:20px}
     table{width:100%;border-collapse:collapse}
     th,td{padding:12px;text-align:left;vertical-align:top}
     tr:not(:first-child){border-top:1px solid rgba(255,255,255,0.08)}
 
-    .status{font-weight:600;padding:6px 10px;border-radius:999px;display:inline-block}
+    /* Status pills - squarish shape */
+    .status{font-weight:600;padding:6px 12px;border-radius:8px;display:inline-block}
     .status.notpicked{background:#6b1f1f;color:#ffecec}
     .status.preparing{background:#6b4d1f;color:#fff8e0}
-    .status.ready{background:#1e4f2d;color:#ffffff;animation:pulse 1.8s infinite;box-shadow:0 0 8px rgba(0,255,0,0.4)}
-    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.8;transform:scale(1.05)}}
+    .status.ready{
+      background:#1e4f2d;color:#ffffff;
+      /* Smooth, seamless pulse with alternate direction (no snap) */
+      animation: readyGlow 2.8s ease-in-out infinite alternate;
+    }
+    @keyframes readyGlow{
+      from { transform:scale(1);   box-shadow:0 0 0 rgba(0,255,120,0.00); }
+      to   { transform:scale(1.03);box-shadow:0 0 20px rgba(0,255,120,0.40); }
+    }
 
-    .asset-pill{display:inline-block;border-radius:8px;padding:6px 10px;margin:3px 4px 0 0;font-weight:600;color:#f0e6ff}
-    .asset-video{background-color:rgba(178,102,255,0.35)} /* Brighter purple */
-    .asset-sound{background-color:rgba(255,0,0,0.25)}
-    .asset-lighting{background-color:rgba(255,235,59,0.55);color:#ffffff}
-    .asset-grip{background-color:rgba(0,123,255,0.28);color:#eaf2ff}
-    .asset-uncategorised,.asset-uncategorized{background-color:rgba(128,128,128,0.25)}
+    /* Asset pills */
+    .asset-pill{display:inline-block;border-radius:8px;padding:6px 10px;margin:3px 4px 0 0;font-weight:600}
+    .asset-video{background-color:rgba(128,0,128,0.25); color:#efe8ff}
+    .asset-sound{background-color:rgba(200,50,50,0.25); color:#ffecec}
+    .asset-lighting{background-color:rgba(255,235,59,0.45); color:#ffffff}
+    .asset-grip{background-color:rgba(0,123,255,0.28); color:#eaf2ff}
+    .asset-uncategorised,.asset-uncategorized{background-color:rgba(200,200,200,0.18); color:#f0f0f0}
 
+    /* Buttons */
     button{padding:6px 10px;border-radius:8px;border:0;cursor:pointer;font-weight:700}
     .btn-preparing{background:#f1c232;color:#222}
     .btn-ready{background:#1e4f2d;color:#fff}
     .btn-clear{background:#777;color:#fff}
+    .btn-toggle{background:#333;color:#fff;padding:8px 12px;border-radius:8px;font-weight:600}
+    .btn-toggle.on{background:#1e4f2d;color:#fff;box-shadow:0 0 8px rgba(0,255,100,0.3)}
   </style>
 </head>
 <body>
   <header>
     <h1>Technician Dashboard</h1>
-    <div id="clock" style="opacity:.9;font-size:13px">Loading...</div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button id="autoToggle" class="btn-toggle">Auto-Ready: OFF</button>
+      <div id="clock" style="opacity:.9;font-size:13px">Loading...</div>
+    </div>
   </header>
 
   <main style="padding:16px">
@@ -49,6 +64,18 @@
   </main>
 
   <script>
+    let bookings = [];
+    let autoReadyEnabled = false;
+    let autoReadyTimer = null;
+
+    const tableWrap = document.getElementById('tableWrap');
+    const clockEl = document.getElementById('clock');
+    const autoToggle = document.getElementById('autoToggle');
+
+    // --- Utility functions ---
+    function updateClock(){clockEl.textContent=new Date().toLocaleString()}
+    setInterval(updateClock,1000);updateClock();
+
     function normalizeCategory(rawCategory, assetName){
       const s=(rawCategory||'').toString().toLowerCase();
       const n=(assetName||'').toString().toLowerCase();
@@ -61,12 +88,19 @@
       return 'uncategorised';
     }
 
-    const tableWrap=document.getElementById('tableWrap');
-    const clockEl=document.getElementById('clock');
-    function updateClock(){clockEl.textContent=new Date().toLocaleString()}
-    setInterval(updateClock,1000);updateClock();
+    function statusClass(status){
+      const t=(status||'').toLowerCase();
+      if (t.includes('ready')) return 'ready';
+      if (t.includes('prepar')) return 'preparing';
+      if (t.includes('not')) return 'notpicked';
+      return t.replace(/\s+/g,'');
+    }
 
-    function formatTime(dt){if(!dt)return'';const d=new Date(dt);return isNaN(d)?dt:d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+    function formatTime(dt){
+      if(!dt)return'';
+      const d=new Date(dt);
+      return isNaN(d)?dt:d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    }
 
     function renderAssets(assets){
       return (assets||[]).map(a=>{
@@ -77,34 +111,40 @@
       }).join('');
     }
 
+    // --- Status Updates ---
     async function updateStatus(key,status){
       try{
-        await fetch('/api/update-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,status})});
+        await fetch('/api/update-status',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({key,status})
+        });
         await fetchBookings();
       }catch(e){console.error('Update failed',e);}
     }
 
+    // --- Fetch + Render ---
     async function fetchBookings(){
       try{
         const resp=await fetch('/api/bookings');
         const data=await resp.json();
-        const bookings=(data.success&&Array.isArray(data.bookings))?data.bookings:[];
+        bookings=(data.success&&Array.isArray(data.bookings))?data.bookings:[];
         bookings.sort((a,b)=>new Date(a.startdatetime)-new Date(b.startdatetime));
         renderTable(bookings);
       }catch(e){console.error('Fetch failed',e);}
     }
 
-    function renderTable(bookings){
+    function renderTable(list){
       let html='<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th><th>Actions</th></tr></thead><tbody>';
-      if(!bookings.length){html+='<tr><td colspan="5">No bookings for today.</td></tr>'}
+      if(!list.length){html+='<tr><td colspan="5">No bookings for today.</td></tr>'}
       else{
-        for(const b of bookings){
+        for(const b of list){
           const time=formatTime(b.startdatetime);
-          const stClass=b.status.toLowerCase().replace(/\s+/g,'');
+          const cls=statusClass(b.status);
           html+=`<tr>
             <td>${time}</td>
             <td>${b.username}</td>
-            <td><span class="status ${stClass}">${b.status}</span></td>
+            <td><span class="status ${cls}">${b.status}</span></td>
             <td>${renderAssets(b.assets)}</td>
             <td>
               ${b.status==='Not Picked'?`<button class="btn-preparing" onclick="updateStatus('${b._groupKey}','preparing')">Preparing</button>`:''}
@@ -117,6 +157,44 @@
       html+='</tbody></table>';
       tableWrap.innerHTML=html;
     }
+
+    // --- Auto-Ready: persistence helpers ---
+    function setAutoReadyEnabled(val){
+      autoReadyEnabled = !!val;
+      localStorage.setItem('autoReadyEnabled', String(autoReadyEnabled));
+      autoToggle.classList.toggle('on', autoReadyEnabled);
+      autoToggle.textContent = autoReadyEnabled ? 'Auto-Ready: ON' : 'Auto-Ready: OFF';
+      if (autoReadyEnabled) startAutoReady(); else stopAutoReady();
+    }
+
+    // --- Auto-Ready Toggle (click) ---
+    autoToggle.addEventListener('click',()=>{
+      setAutoReadyEnabled(!autoReadyEnabled);
+    });
+
+    function startAutoReady(){
+      stopAutoReady();
+      autoReadyTimer=setInterval(()=>{
+        const now=new Date();
+        bookings.forEach(b=>{
+          const start=new Date(b.startdatetime);
+          if(start<=now && (b.status==='Not Picked'||b.status==='Preparing')){
+            updateStatus(b._groupKey,'ready');
+          }
+        });
+      },30000); // every 30 seconds
+    }
+
+    function stopAutoReady(){
+      if(autoReadyTimer){clearInterval(autoReadyTimer);autoReadyTimer=null;}
+    }
+
+    // --- Init ---
+    // Restore persisted toggle on load
+    (function initAutoReadyFromStorage(){
+      const saved = localStorage.getItem('autoReadyEnabled');
+      setAutoReadyEnabled(saved === 'true');
+    })();
 
     setInterval(fetchBookings,5000);
     (async function(){await fetchBookings()})();
