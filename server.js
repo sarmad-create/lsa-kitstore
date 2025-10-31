@@ -7,15 +7,16 @@ const fs = require('fs').promises;
 const path = require('path');
 
 const app = express();
-app.set('trust proxy', true); // good behind Render/Heroku
+app.disable('x-powered-by');
+app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
 
-/* ---------- ENV ---------- */
+/* ===== ENV ===== */
 const BASE_URL   = process.env.SISO_BASE_URL || 'https://lsa.siso.co';
 const AUTH_TOKEN = process.env.SISO_AUTH_TOKEN || 'L2Mwz8gUdd';
 const AUTH_KEY   = process.env.SISO_AUTH_KEY   || '13b3dc30-971c-440a-81ee-4f99026d44e7';
-const TECH_PASSWORD = process.env.TECH_PASSWORD || 'tech123';
+const TECH_PASSWORD = process.env.TECH_PASSWORD || 'tech123'; // <-- set this in .env and Render
 
 const STATUS_FILE = path.join(__dirname, 'statuses.json');
 const CATEGORY_OVERRIDES_FILE = path.join(__dirname, 'categories.json');
@@ -26,26 +27,7 @@ if (!AUTH_TOKEN || !AUTH_KEY) {
   process.exit(1);
 }
 
-/* ---------- BASIC AUTH for TECH ---------- */
-function techAuth(req, res, next) {
-  const hdr = req.headers.authorization || '';
-  if (!hdr.startsWith('Basic ')) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="Technician Area"');
-    return res.status(401).send('Authentication required.');
-  }
-  let user = '', pass = '';
-  try {
-    [user, pass] = Buffer.from(hdr.split(' ')[1], 'base64').toString().split(':');
-  } catch (_) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="Technician Area"');
-    return res.status(401).send('Invalid auth.');
-  }
-  if (pass === TECH_PASSWORD) return next();
-  res.setHeader('WWW-Authenticate', 'Basic realm="Technician Area"');
-  return res.status(401).send('Access denied.');
-}
-
-/* ---------- FILE HELPERS ---------- */
+/* ===== UTIL: JSON file helpers ===== */
 async function readJson(file, fallback) {
   try {
     const raw = await fs.readFile(file, 'utf8');
@@ -69,7 +51,7 @@ const DEFAULT_LISTS = { grip:[], video:[], lighting:[], sound:[] };
 async function readLists(){ return readJson(LISTS_FILE, DEFAULT_LISTS); }
 async function writeLists(l){ return writeJson(LISTS_FILE, l); }
 
-/* ---------- JWT CACHE ---------- */
+/* ===== JWT cache ===== */
 let cachedJwt = null, jwtExpiry = 0;
 async function getJwt() {
   const now = Date.now();
@@ -83,7 +65,7 @@ async function getJwt() {
   cachedJwt = token; jwtExpiry = Date.now() + 55*1000; return cachedJwt;
 }
 
-/* ---------- DATE/GROUP HELPERS ---------- */
+/* ===== Date helpers ===== */
 function formatDateForApi(d) {
   const dd = String(d.getDate()).padStart(2,'0');
   const mm = String(d.getMonth()+1).padStart(2,'0');
@@ -127,9 +109,9 @@ function makeGroupKey(username, startdatetime) {
   return `${(username||'Unknown').trim()}_${(startdatetime||'Unknown').trim()}`;
 }
 
-/* ---------- CATEGORY HELPERS (short version) ---------- */
+/* ===== Category helper (short) ===== */
 function norm(s){return (s||'').toString().toLowerCase().trim();}
-function decideCategory(row, assetName, overrides, sets) {
+function decideCategory(row, assetName, overrides) {
   const key = norm(assetName);
   if (overrides[key]) return overrides[key];
   const raw = [
@@ -143,26 +125,50 @@ function decideCategory(row, assetName, overrides, sets) {
   return 'uncategorised';
 }
 
-/* ---------- ROUTES ---------- */
+/* ===== BASIC AUTH (applies to /tech and protected APIs) ===== */
+function techAuth(req, res, next) {
+  const hdr = req.headers.authorization || '';
+  if (!hdr.startsWith('Basic ')) {
+    console.log('🔐 techAuth: no header -> challenge');
+    res.setHeader('WWW-Authenticate', 'Basic realm="Technician Area"');
+    return res.status(401).send('Authentication required.');
+  }
+  try {
+    const decoded = Buffer.from(hdr.split(' ')[1], 'base64').toString();
+    const parts = decoded.split(':'); // [username, password]
+    const pass = parts.slice(1).join(':'); // support ":" in username
+    if (pass === TECH_PASSWORD) {
+      console.log('✅ techAuth: success');
+      return next();
+    }
+    console.log('⛔ techAuth: wrong password');
+  } catch (e) {
+    console.log('⛔ techAuth: decode error', e.message);
+  }
+  res.setHeader('WWW-Authenticate', 'Basic realm="Technician Area"');
+  return res.status(401).send('Access denied.');
+}
 
-// Block direct access to tech.html and force /tech (so Basic Auth triggers)
+/* ===== Routes ===== */
+
+/* Redirect any direct /tech.html access to /tech so auth runs */
 app.get(['/tech.html','/public/tech.html'], (req,res)=> res.redirect(302, '/tech'));
 
-// Protect /tech page
-app.get('/tech', techAuth, (req, res) => {
+/* PROTECT everything under /tech first */
+app.use('/tech', techAuth);
+
+/* Serve the protected tech page */
+app.get('/tech', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'tech.html'));
 });
 
-// Serve static AFTER the /tech route so /tech is not shadowed
-app.use('/', express.static(path.join(__dirname, 'public')));
-
-// Public lists (view)
+/* Public endpoints */
 app.get('/api/lists', async (_req, res) => {
   const lists = await readLists();
   res.json({ success: true, lists });
 });
 
-// Update lists (TECH only)
+/* PROTECT tech-only API endpoints */
 app.post('/api/lists', techAuth, async (req, res) => {
   const incoming = req.body || {};
   const lists = await readLists();
@@ -172,8 +178,6 @@ app.post('/api/lists', techAuth, async (req, res) => {
   await writeLists(lists);
   res.json({ success: true, lists });
 });
-
-// Manual per-asset category override (TECH only)
 app.post('/api/category-override', techAuth, async (req,res)=>{
   const { assetName, category } = req.body || {};
   const allowed = ['video','sound','lighting','grip','uncategorised'];
@@ -184,11 +188,11 @@ app.post('/api/category-override', techAuth, async (req,res)=>{
   await writeCategoryOverrides(map);
   res.json({ success:true, overrides: map });
 });
-app.get('/api/category-override', async (_req, res)=>{
+app.get('/api/category-override', techAuth, async (_req, res)=>{
   res.json({ success: true, overrides: await readCategoryOverrides() });
 });
 
-// Public: bookings for today
+/* Public: bookings (today) */
 app.get('/api/bookings', async (req, res) => {
   try {
     const today = new Date();
@@ -248,7 +252,7 @@ app.get('/api/bookings', async (req, res) => {
   }
 });
 
-// Tech status override (TECH only)
+/* PROTECT tech status update */
 app.post('/api/update-status', techAuth, async (req, res) => {
   try {
     const { key, status } = req.body || {};
@@ -267,12 +271,10 @@ app.post('/api/update-status', techAuth, async (req, res) => {
   }
 });
 
-// Debug: see tech overrides
-app.get('/api/overrides', async (_req, res) => {
-  res.json({ success:true, overrides: await readStatuses() });
-});
+/* Static AFTER protected routes so /tech cannot be shadowed */
+app.use('/', express.static(path.join(__dirname, 'public')));
 
-/* ---------- START ---------- */
+/* Start */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ SISO dashboard backend running at http://localhost:${PORT}`);
