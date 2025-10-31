@@ -17,31 +17,16 @@
     .status{font-weight:600;padding:6px 10px;border-radius:6px;display:inline-block}
     .status.notpicked{background:#6b1f1f;color:#ffecec}
     .status.preparing{background:#6b4d1f;color:#fff8e0}
-    .status.readyforcollection{
-      background:#1e4f2d;
-      color:#ffffff;
-      animation:pulse-green 2s infinite;
-    }
+    .status.ready{background:#1e4f2d;color:#ffffff;animation:pulse 1.8s infinite;box-shadow:0 0 8px rgba(0,255,0,0.4)}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(1.05)}}
 
-    @keyframes pulse-green {
-      0% { box-shadow: 0 0 0 0 rgba(30, 79, 45, 0.8); }
-      70% { box-shadow: 0 0 0 8px rgba(30, 79, 45, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(30, 79, 45, 0); }
-    }
-
-    /* Asset category pills */
-    .asset-pill {
-      display:inline-block;
-      border-radius:6px;
-      padding:4px 8px;
-      margin:2px;
-      font-weight:600;
-      color:#e6eef8;
-    }
-    .asset-video { background-color: rgba(128, 0, 128, 0.15); }
-    .asset-sound { background-color: rgba(255, 0, 0, 0.15); }
-    .asset-lighting { background-color: rgba(255, 235, 59, 0.35); color:#ffffff; }
-    .asset-grip, .asset-uncategorised { background-color: rgba(128, 128, 128, 0.15); }
+    /* Asset pills */
+    .asset-pill{display:inline-block;border-radius:6px;padding:4px 8px;margin:2px;font-weight:600;color:#e6eef8}
+    .asset-video{background-color:rgba(128,0,128,0.25)}
+    .asset-sound{background-color:rgba(255,0,0,0.25)}
+    .asset-lighting{background-color:rgba(255,235,59,0.45);color:#fff}
+    .asset-grip{background-color:rgba(128,128,128,0.25)}
+    .asset-uncategorised,.asset-uncategorized{background-color:rgba(128,128,128,0.25)}
   </style>
 </head>
 <body>
@@ -50,13 +35,11 @@
       <h1>Today's Collections</h1>
       <div id="clock" style="opacity:.9;font-size:13px">Loading...</div>
     </div>
-    <div>
-      <div id="pageInfo">Page 0 of 0</div>
-    </div>
+    <div><div id="pageInfo">Page 0 of 0</div></div>
   </header>
 
   <main style="padding:16px">
-    <div style="font-size: 12px; opacity: 0.8; margin-bottom: 8px;">
+    <div style="font-size:12px;opacity:.8;margin-bottom:8px">
       <span class="asset-pill asset-video">Video</span>
       <span class="asset-pill asset-sound">Sound</span>
       <span class="asset-pill asset-lighting">Lighting</span>
@@ -67,47 +50,63 @@
   </main>
 
   <script>
-    let bookings = [];
-    let page = 0;
-    const pageSize = 8;
-    let rotateTimer = null;
-    const pageInfo = document.getElementById('pageInfo');
-    const tableWrap = document.getElementById('tableWrap');
-    const clockEl = document.getElementById('clock');
+    /* ---------- Robust client-side category normalization ---------- */
+    function normalizeCategory(rawCategory, assetName){
+      const s=(rawCategory||'').toString().toLowerCase();
+      const n=(assetName||'').toString().toLowerCase();
+      const has = (w)=> s.includes(w)||n.includes(w);
 
-    function updateClock(){
-      clockEl.textContent = new Date().toLocaleString();
+      // VIDEO
+      if (has('video')||has('camera')||has('cam')||has('lens')||has('sony fx')||has('a7')||has('a6000')||has('a7iv')||has('fs')||has('xavc')||s==='video') {
+        return 'video';
+      }
+      // SOUND
+      if (has('audio')||has('sound')||has('mic')||has('microphone')||has('rode')||has('ntg')||has('shotgun')||has('zoom h')||has('tascam')||s==='sound') {
+        return 'sound';
+      }
+      // LIGHTING
+      if (has('light')||has('aputure')||has('amaran')||has('nanlite')||has('godox')||has('led')||s==='lighting') {
+        return 'lighting';
+      }
+      // GRIP / SUPPORT
+      if (has('tripod')||has('sachtler')||has('manfrotto')||has('head')||has('rig')||has('smallrig')||has('stand')||has('c-stand')||has('arm')||has('clamp')||s==='grip') {
+        return 'grip';
+      }
+      return 'uncategorised';
     }
-    setInterval(updateClock, 1000);
-    updateClock();
 
-    function formatTime(dt){
-      if (!dt) return '';
-      const d = new Date(dt);
-      return isNaN(d) ? dt : d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-    }
+    let bookings=[],page=0;const pageSize=8;let rotateTimer=null;
+    const pageInfo=document.getElementById('pageInfo'),tableWrap=document.getElementById('tableWrap'),clockEl=document.getElementById('clock');
+
+    function updateClock(){clockEl.textContent=new Date().toLocaleString()}
+    setInterval(updateClock,1000);updateClock();
+
+    function formatTime(dt){if(!dt)return'';const d=new Date(dt);return isNaN(d)?dt:d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
 
     function renderAssets(assets){
-      return assets.map(a => {
-        const cls = a.category.toLowerCase().replace(/\s+/g,'');
-        return `<span class="asset-pill asset-${cls}">${a.name}</span>`;
+      // assets may be strings or objects {name, category}
+      return (assets||[]).map(a=>{
+        const name = typeof a==='string'?a:(a.name||'');
+        const rawCat = typeof a==='string'?'':(a.category||'');
+        const norm = normalizeCategory(rawCat,name);
+        return `<span class="asset-pill asset-${norm}" title="${norm}">${name}</span>`;
       }).join('');
     }
 
     function renderPage(){
-      const totalPages = Math.max(1, Math.ceil(bookings.length / pageSize));
-      if (page >= totalPages) page = 0;
-      const start = page * pageSize;
-      const pageBookings = bookings.slice(start, start + pageSize);
-      pageInfo.textContent = `Page ${page+1} of ${totalPages} — ${bookings.length} total`;
+      const totalPages=Math.max(1,Math.ceil(bookings.length/pageSize));
+      if(page>=totalPages)page=0;
+      const start=page*pageSize;
+      const pageBookings=bookings.slice(start,start+pageSize);
+      pageInfo.textContent=`Page ${page+1} of ${totalPages} — ${bookings.length} total`;
 
       let html = '<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th></tr></thead><tbody>';
-      if (pageBookings.length === 0) {
+      if(!pageBookings.length){
         html += '<tr><td colspan="4">No bookings for today.</td></tr>';
-      } else {
-        for (const b of pageBookings) {
-          const time = formatTime(b.startdatetime);
-          const stClass = b.status.toLowerCase().replace(/\s+/g,'');
+      }else{
+        for(const b of pageBookings){
+          const time=formatTime(b.startdatetime);
+          const stClass=b.status.toLowerCase().replace(/\s+/g,'');
           html += `<tr>
             <td>${time}</td>
             <td>${b.username}</td>
@@ -116,45 +115,27 @@
           </tr>`;
         }
       }
-      html += '</tbody></table>';
-      tableWrap.innerHTML = html;
+      html+='</tbody></table>';
+      tableWrap.innerHTML=html;
     }
 
     async function fetchBookings(){
-      try {
-        const resp = await fetch('/api/bookings');
-        const data = await resp.json();
-        const allBookings = data.success && Array.isArray(data.bookings) ? data.bookings : [];
-
-        // 🕒 today's date filter
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        bookings = allBookings.filter(b => {
-          const d = new Date(b.startdatetime);
-          d.setHours(0,0,0,0);
-          return d.getTime() === today.getTime();
-        });
-
-        bookings.sort((a, b) => new Date(a.startdatetime) - new Date(b.startdatetime));
-        page = 0;
-        renderPage();
-      } catch (err) {
-        console.error('Fetch bookings failed', err);
-      }
+      try{
+        const resp=await fetch('/api/bookings');
+        const data=await resp.json();
+        bookings=(data.success&&Array.isArray(data.bookings))?data.bookings:[];
+        bookings.sort((a,b)=>new Date(a.startdatetime)-new Date(b.startdatetime));
+        page=0;renderPage();
+      }catch(e){console.error('Fetch bookings failed',e);}
     }
 
-    function startAutoRotate(){
-      stopAutoRotate();
-      rotateTimer = setInterval(()=>{ page++; renderPage(); }, 10000);
-    }
-    function stopAutoRotate(){
-      if (rotateTimer) { clearInterval(rotateTimer); rotateTimer = null; }
-    }
+    function startAutoRotate(){stopAutoRotate();rotateTimer=setInterval(()=>{page++;renderPage()},10000)}
+    function stopAutoRotate(){if(rotateTimer){clearInterval(rotateTimer);rotateTimer=null}}
 
-    setInterval(fetchBookings, 5000);
-    (async function(){ await fetchBookings(); startAutoRotate(); })();
-    tableWrap.addEventListener('mouseover', stopAutoRotate);
-    tableWrap.addEventListener('mouseout', startAutoRotate);
+    setInterval(fetchBookings,5000);
+    (async function(){await fetchBookings();startAutoRotate()})();
+    tableWrap.addEventListener('mouseover',stopAutoRotate);
+    tableWrap.addEventListener('mouseout',startAutoRotate);
   </script>
 </body>
 </html>

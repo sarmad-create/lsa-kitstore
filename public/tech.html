@@ -2,197 +2,98 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Siso Technician Dashboard</title>
+  <title>Technician Dashboard</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;background:#20132b;color:#e6eef8}
-    header{padding:16px;background:#150c1f;display:flex;justify-content:space-between;align-items:center}
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;background:#1a1024;color:#f0e6ff}
+    header{padding:16px;background:#2c1952;display:flex;justify-content:space-between;align-items:center}
     h1{margin:0;font-size:20px}
-    #pageInfo{font-size:14px;opacity:0.85}
     table{width:100%;border-collapse:collapse}
     th,td{padding:12px;text-align:left;vertical-align:top}
-    tr:not(:first-child){border-top:1px solid rgba(255,255,255,0.06)}
-
-    /* Status Pills */
+    tr:not(:first-child){border-top:1px solid rgba(255,255,255,0.08)}
     .status{font-weight:600;padding:6px 10px;border-radius:6px;display:inline-block}
     .status.notpicked{background:#6b1f1f;color:#ffecec}
     .status.preparing{background:#6b4d1f;color:#fff8e0}
-    .status.readyforcollection{
-      background:#1e4f2d;
-      color:#ffffff;
-      animation:pulse-green 2s infinite;
-    }
-
-    @keyframes pulse-green {
-      0% { box-shadow: 0 0 0 0 rgba(30, 79, 45, 0.8); }
-      70% { box-shadow: 0 0 0 8px rgba(30, 79, 45, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(30, 79, 45, 0); }
-    }
-
-    /* Assets */
-    .asset-pill {
-      display:inline-block;
-      border-radius:6px;
-      padding:4px 8px;
-      margin:2px;
-      font-weight:600;
-      color:#e6eef8;
-    }
-    .asset-video { background-color: rgba(128, 0, 128, 0.15); }
-    .asset-sound { background-color: rgba(255, 0, 0, 0.15); }
-    .asset-lighting { background-color: rgba(255, 235, 59, 0.35); color:#ffffff; }
-    .asset-grip, .asset-uncategorised { background-color: rgba(128, 128, 128, 0.15); }
-
-    /* Buttons */
-    .action-btn {
-      padding:6px 10px;
-      border-radius:6px;
-      border:none;
-      cursor:pointer;
-      font-weight:600;
-      color:#fff;
-      margin-right:5px;
-      opacity:0.85;
-      transition: all 0.2s ease;
-    }
-    .action-btn.preparing { background:#b5811f; }
-    .action-btn.ready { background:#1e4f2d; }
-    .action-btn.clear { background:#444; }
-    .action-btn.active { outline: 2px solid #fff; opacity: 1; }
-    .action-btn:hover { opacity:1; }
+    .status.ready{background:#1e4f2d;color:#ffffff;animation:pulse 1.8s infinite;box-shadow:0 0 8px rgba(0,255,0,0.4);}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(1.05)}}
+    button{padding:6px 10px;border-radius:6px;border:0;cursor:pointer;font-weight:600}
+    .btn-preparing{background:#f1c232;color:#222}
+    .btn-ready{background:#3cba54;color:#fff}
+    .btn-clear{background:#777;color:#fff}
+    .asset-pill{display:inline-block;border-radius:6px;padding:4px 8px;margin:2px;font-weight:600;color:#f0e6ff}
+    .asset-video{background-color:rgba(128,0,128,0.25)}
+    .asset-sound{background-color:rgba(255,0,0,0.25)}
+    .asset-lighting{background-color:rgba(255,235,59,0.35);color:#fff}
+    .asset-grip,.asset-uncategorised,.asset-uncategorized{background-color:rgba(128,128,128,0.25)}
   </style>
 </head>
 <body>
   <header>
-    <div>
-      <h1>Technician Dashboard</h1>
-      <div id="clock" style="opacity:.9;font-size:13px">Loading...</div>
-    </div>
-    <div><div id="pageInfo">Page 0 of 0</div></div>
+    <h1>Technician Dashboard</h1>
+    <div id="clock" style="opacity:.9;font-size:13px">Loading...</div>
   </header>
 
   <main style="padding:16px">
-    <div style="font-size: 12px; opacity: 0.8; margin-bottom: 8px;">
+    <div style="font-size:12px;opacity:0.8;margin-bottom:8px;">
       <span class="asset-pill asset-video">Video</span>
       <span class="asset-pill asset-sound">Sound</span>
       <span class="asset-pill asset-lighting">Lighting</span>
-      <span class="asset-pill asset-grip">Grip</span>
-      <span class="asset-pill asset-uncategorised">Uncategorised</span>
+      <span class="asset-pill asset-grip">Grip / Uncategorised</span>
     </div>
     <div id="tableWrap"></div>
   </main>
 
   <script>
-    let bookings = [];
-    let page = 0;
-    const pageSize = 8;
-    let rotateTimer = null;
-    const pageInfo = document.getElementById('pageInfo');
-    const tableWrap = document.getElementById('tableWrap');
-    const clockEl = document.getElementById('clock');
+    const tableWrap=document.getElementById('tableWrap');
+    const clockEl=document.getElementById('clock');
+    function updateClock(){clockEl.textContent=new Date().toLocaleString();}
+    setInterval(updateClock,1000);updateClock();
 
-    function updateClock(){
-      clockEl.textContent = new Date().toLocaleString();
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
+    function formatTime(dt){if(!dt)return'';const d=new Date(dt);return isNaN(d)?dt:d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+    function renderAssets(assets){return assets.map(a=>`<span class="asset-pill asset-${a.category.toLowerCase()}">${a.name}</span>`).join('');}
 
-    function formatTime(dt){
-      if (!dt) return '';
-      const d = new Date(dt);
-      return isNaN(d) ? dt : d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    async function updateStatus(key,status){
+      try{
+        await fetch('/api/update-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,status})});
+        await fetchBookings();
+      }catch(err){console.error('Update failed',err);}
     }
 
-    function renderAssets(assets){
-      return assets.map(a => {
-        const cls = a.category.toLowerCase().replace(/\s+/g,'');
-        return `<span class="asset-pill asset-${cls}">${a.name}</span>`;
-      }).join('');
+    async function fetchBookings(){
+      try{
+        const resp=await fetch('/api/bookings');
+        const data=await resp.json();
+        const bookings=data.success&&Array.isArray(data.bookings)?data.bookings:[];
+        bookings.sort((a,b)=>new Date(a.startdatetime)-new Date(b.startdatetime));
+        renderTable(bookings);
+      }catch(err){console.error('Fetch failed',err);}
     }
 
-    function renderPage(){
-      const totalPages = Math.max(1, Math.ceil(bookings.length / pageSize));
-      if (page >= totalPages) page = 0;
-      const start = page * pageSize;
-      const pageBookings = bookings.slice(start, start + pageSize);
-      pageInfo.textContent = `Page ${page+1} of ${totalPages} — ${bookings.length} total`;
-
-      let html = '<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th><th>Action</th></tr></thead><tbody>';
-      if (pageBookings.length === 0) {
-        html += '<tr><td colspan="5">No bookings for today.</td></tr>';
-      } else {
-        for (const b of pageBookings) {
-          const time = formatTime(b.startdatetime);
-          const stClass = b.status.toLowerCase().replace(/\s+/g,'');
-          const prepActive = stClass === 'preparing' ? 'active' : '';
-          const readyActive = stClass === 'readyforcollection' ? 'active' : '';
-          const clearActive = (stClass !== 'readyforcollection' && stClass !== 'preparing') ? 'active' : '';
-
-          html += `<tr>
+    function renderTable(bookings){
+      let html='<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th><th>Actions</th></tr></thead><tbody>';
+      if(!bookings.length){html+='<tr><td colspan="5">No bookings for today.</td></tr>';}
+      else{
+        for(const b of bookings){
+          const time=formatTime(b.startdatetime);
+          const stClass=b.status.toLowerCase().replace(/\s+/g,'');
+          html+=`<tr>
             <td>${time}</td>
             <td>${b.username}</td>
             <td><span class="status ${stClass}">${b.status}</span></td>
             <td>${renderAssets(b.assets)}</td>
             <td>
-              <button class="action-btn preparing ${prepActive}" onclick="updateStatus('${b._groupKey}','preparing')">Preparing</button>
-              <button class="action-btn ready ${readyActive}" onclick="updateStatus('${b._groupKey}','ready')">Ready</button>
-              <button class="action-btn clear ${clearActive}" onclick="updateStatus('${b._groupKey}','clear')">Clear</button>
+              ${b.status==='Not Picked'?`<button class="btn-preparing" onclick="updateStatus('${b._groupKey}','preparing')">Preparing</button>`:''}
+              ${b.status==='Preparing'?`<button class="btn-ready" onclick="updateStatus('${b._groupKey}','ready')">Ready</button>`:''}
+              <button class="btn-clear" onclick="updateStatus('${b._groupKey}','clear')">Clear</button>
             </td>
           </tr>`;
         }
       }
-      html += '</tbody></table>';
-      tableWrap.innerHTML = html;
+      html+='</tbody></table>';tableWrap.innerHTML=html;
     }
 
-    async function fetchBookings(){
-      try {
-        const resp = await fetch('/api/bookings');
-        const data = await resp.json();
-        const allBookings = data.success && Array.isArray(data.bookings) ? data.bookings : [];
-
-        // 🕒 today's date filter
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        bookings = allBookings.filter(b => {
-          const d = new Date(b.startdatetime);
-          d.setHours(0,0,0,0);
-          return d.getTime() === today.getTime();
-        });
-
-        bookings.sort((a, b) => new Date(a.startdatetime) - new Date(b.startdatetime));
-        page = 0;
-        renderPage();
-      } catch (err) {
-        console.error('Fetch bookings failed', err);
-      }
-    }
-
-    async function updateStatus(key, status){
-      try {
-        await fetch('/api/update-status', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({ key, status })
-        });
-        fetchBookings();
-      } catch (err) {
-        console.error('Update status failed', err);
-      }
-    }
-
-    function startAutoRotate(){
-      stopAutoRotate();
-      rotateTimer = setInterval(()=>{ page++; renderPage(); }, 10000);
-    }
-    function stopAutoRotate(){
-      if (rotateTimer) { clearInterval(rotateTimer); rotateTimer = null; }
-    }
-
-    setInterval(fetchBookings, 5000);
-    (async function(){ await fetchBookings(); startAutoRotate(); })();
-    tableWrap.addEventListener('mouseover', stopAutoRotate);
-    tableWrap.addEventListener('mouseout', startAutoRotate);
+    setInterval(fetchBookings,5000);
+    (async function init(){await fetchBookings();})();
   </script>
 </body>
 </html>
