@@ -1,0 +1,160 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Siso Collections Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;background:#0b1320;color:#e6eef8}
+    header{padding:16px;background:#071126;display:flex;justify-content:space-between;align-items:center}
+    h1{margin:0;font-size:20px}
+    #pageInfo{font-size:14px;opacity:0.85}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:12px;text-align:left;vertical-align:top}
+    tr:not(:first-child){border-top:1px solid rgba(255,255,255,0.06)}
+
+    /* Status Pills */
+    .status{font-weight:600;padding:6px 10px;border-radius:6px;display:inline-block}
+    .status.notpicked{background:#6b1f1f;color:#ffecec}
+    .status.preparing{background:#6b4d1f;color:#fff8e0}
+    .status.readyforcollection{
+      background:#1e4f2d;
+      color:#ffffff;
+      animation:pulse-green 2s infinite;
+    }
+
+    @keyframes pulse-green {
+      0% { box-shadow: 0 0 0 0 rgba(30, 79, 45, 0.8); }
+      70% { box-shadow: 0 0 0 8px rgba(30, 79, 45, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(30, 79, 45, 0); }
+    }
+
+    /* Asset category pills */
+    .asset-pill {
+      display:inline-block;
+      border-radius:6px;
+      padding:4px 8px;
+      margin:2px;
+      font-weight:600;
+      color:#e6eef8;
+    }
+    .asset-video { background-color: rgba(128, 0, 128, 0.15); }
+    .asset-sound { background-color: rgba(255, 0, 0, 0.15); }
+    .asset-lighting { background-color: rgba(255, 235, 59, 0.35); color:#ffffff; }
+    .asset-grip, .asset-uncategorised { background-color: rgba(128, 128, 128, 0.15); }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Today's Collections</h1>
+      <div id="clock" style="opacity:.9;font-size:13px">Loading...</div>
+    </div>
+    <div>
+      <div id="pageInfo">Page 0 of 0</div>
+    </div>
+  </header>
+
+  <main style="padding:16px">
+    <div style="font-size: 12px; opacity: 0.8; margin-bottom: 8px;">
+      <span class="asset-pill asset-video">Video</span>
+      <span class="asset-pill asset-sound">Sound</span>
+      <span class="asset-pill asset-lighting">Lighting</span>
+      <span class="asset-pill asset-grip">Grip</span>
+      <span class="asset-pill asset-uncategorised">Uncategorised</span>
+    </div>
+    <div id="tableWrap"></div>
+  </main>
+
+  <script>
+    let bookings = [];
+    let page = 0;
+    const pageSize = 8;
+    let rotateTimer = null;
+    const pageInfo = document.getElementById('pageInfo');
+    const tableWrap = document.getElementById('tableWrap');
+    const clockEl = document.getElementById('clock');
+
+    function updateClock(){
+      clockEl.textContent = new Date().toLocaleString();
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function formatTime(dt){
+      if (!dt) return '';
+      const d = new Date(dt);
+      return isNaN(d) ? dt : d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    }
+
+    function renderAssets(assets){
+      return assets.map(a => {
+        const cls = a.category.toLowerCase().replace(/\s+/g,'');
+        return `<span class="asset-pill asset-${cls}">${a.name}</span>`;
+      }).join('');
+    }
+
+    function renderPage(){
+      const totalPages = Math.max(1, Math.ceil(bookings.length / pageSize));
+      if (page >= totalPages) page = 0;
+      const start = page * pageSize;
+      const pageBookings = bookings.slice(start, start + pageSize);
+      pageInfo.textContent = `Page ${page+1} of ${totalPages} — ${bookings.length} total`;
+
+      let html = '<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th></tr></thead><tbody>';
+      if (pageBookings.length === 0) {
+        html += '<tr><td colspan="4">No bookings for today.</td></tr>';
+      } else {
+        for (const b of pageBookings) {
+          const time = formatTime(b.startdatetime);
+          const stClass = b.status.toLowerCase().replace(/\s+/g,'');
+          html += `<tr>
+            <td>${time}</td>
+            <td>${b.username}</td>
+            <td><span class="status ${stClass}">${b.status}</span></td>
+            <td>${renderAssets(b.assets)}</td>
+          </tr>`;
+        }
+      }
+      html += '</tbody></table>';
+      tableWrap.innerHTML = html;
+    }
+
+    async function fetchBookings(){
+      try {
+        const resp = await fetch('/api/bookings');
+        const data = await resp.json();
+        const allBookings = data.success && Array.isArray(data.bookings) ? data.bookings : [];
+
+        // 🕒 today's date filter
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        bookings = allBookings.filter(b => {
+          const d = new Date(b.startdatetime);
+          d.setHours(0,0,0,0);
+          return d.getTime() === today.getTime();
+        });
+
+        bookings.sort((a, b) => new Date(a.startdatetime) - new Date(b.startdatetime));
+        page = 0;
+        renderPage();
+      } catch (err) {
+        console.error('Fetch bookings failed', err);
+      }
+    }
+
+    function startAutoRotate(){
+      stopAutoRotate();
+      rotateTimer = setInterval(()=>{ page++; renderPage(); }, 10000);
+    }
+    function stopAutoRotate(){
+      if (rotateTimer) { clearInterval(rotateTimer); rotateTimer = null; }
+    }
+
+    setInterval(fetchBookings, 5000);
+    (async function(){ await fetchBookings(); startAutoRotate(); })();
+    tableWrap.addEventListener('mouseover', stopAutoRotate);
+    tableWrap.addEventListener('mouseout', startAutoRotate);
+  </script>
+</body>
+</html>
