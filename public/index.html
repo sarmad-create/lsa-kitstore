@@ -19,7 +19,6 @@
     .status.preparing{background:#6b4d1f;color:#fff8e0}
     .status.ready{
       background:#1e4f2d;color:#ffffff;
-      /* Smooth, seamless pulse with alternate direction (no snap) */
       animation: readyGlow 2.8s ease-in-out infinite alternate;
     }
     @keyframes readyGlow{
@@ -27,7 +26,7 @@
       to   { transform:scale(1.03);box-shadow:0 0 20px rgba(0,255,120,0.40); }
     }
 
-    /* Asset pills */
+    /* Asset pills (pastel/translucent) */
     .asset-pill{display:inline-block;border-radius:8px;padding:6px 10px;margin:3px 4px 0 0;font-weight:600}
     .asset-video{background-color:rgba(128,0,128,0.25); color:#efe8ff}
     .asset-sound{background-color:rgba(200,50,50,0.25); color:#ffecec} /* darker red */
@@ -59,6 +58,7 @@
   </main>
 
   <script>
+    // Fallback only if API doesn't provide category
     function normalizeCategory(rawCategory, assetName){
       const s=(rawCategory||'').toString().toLowerCase();
       const n=(assetName||'').toString().toLowerCase();
@@ -87,12 +87,22 @@
 
     function formatTime(dt){if(!dt)return'';const d=new Date(dt);return isNaN(d)?dt:d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
 
+    function classFromCategory(cat, name){
+      // Prefer API category
+      let c = (cat||'').toString().toLowerCase().trim();
+      if (!c) c = normalizeCategory('', name);
+      if (c === 'uncategorized') c = 'uncategorised'; // unify spelling
+      if (!['video','sound','lighting','grip','uncategorised'].includes(c)) c='uncategorised';
+      return c;
+    }
+
     function renderAssets(assets){
       return (assets||[]).map(a=>{
         const name = typeof a==='string'?a:(a.name||'');
-        const rawCat = typeof a==='string'?'':(a.category||'');
-        const norm = normalizeCategory(rawCat,name);
-        return `<span class="asset-pill asset-${norm}" title="${norm}">${name}</span>`;
+        // TRUST server-provided category first
+        const cat  = (typeof a==='object' && a.category) ? a.category : '';
+        const cls  = classFromCategory(cat, name);
+        return `<span class="asset-pill asset-${cls}" title="${cls}">${name}</span>`;
       }).join('');
     }
 

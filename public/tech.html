@@ -18,7 +18,6 @@
     .status.preparing{background:#6b4d1f;color:#fff8e0}
     .status.ready{
       background:#1e4f2d;color:#ffffff;
-      /* Smooth, seamless pulse with alternate direction (no snap) */
       animation: readyGlow 2.8s ease-in-out infinite alternate;
     }
     @keyframes readyGlow{
@@ -72,10 +71,10 @@
     const clockEl = document.getElementById('clock');
     const autoToggle = document.getElementById('autoToggle');
 
-    // --- Utility functions ---
     function updateClock(){clockEl.textContent=new Date().toLocaleString()}
     setInterval(updateClock,1000);updateClock();
 
+    // Fallback only if API doesn't provide category
     function normalizeCategory(rawCategory, assetName){
       const s=(rawCategory||'').toString().toLowerCase();
       const n=(assetName||'').toString().toLowerCase();
@@ -86,6 +85,14 @@
       if (has('light')||has('aputure')||has('amaran')||has('nanlite')||has('godox')||has('led')) return 'lighting';
       if (has('tripod')||has('sachtler')||has('manfrotto')||has('smallrig')||has('stand')||has('c-stand')||has('arm')||has('clamp')) return 'grip';
       return 'uncategorised';
+    }
+
+    function classFromCategory(cat, name){
+      let c = (cat||'').toString().toLowerCase().trim();
+      if (!c) c = normalizeCategory('', name);
+      if (c === 'uncategorized') c = 'uncategorised';
+      if (!['video','sound','lighting','grip','uncategorised'].includes(c)) c='uncategorised';
+      return c;
     }
 
     function statusClass(status){
@@ -105,13 +112,12 @@
     function renderAssets(assets){
       return (assets||[]).map(a=>{
         const name = typeof a==='string'?a:(a.name||'');
-        const rawCat = typeof a==='string'?'':(a.category||'');
-        const norm = normalizeCategory(rawCat,name);
-        return `<span class="asset-pill asset-${norm}" title="${norm}">${name}</span>`;
+        const cat  = (typeof a==='object' && a.category) ? a.category : '';
+        const cls  = classFromCategory(cat, name);
+        return `<span class="asset-pill asset-${cls}" title="${cls}">${name}</span>`;
       }).join('');
     }
 
-    // --- Status Updates ---
     async function updateStatus(key,status){
       try{
         await fetch('/api/update-status',{
@@ -123,7 +129,6 @@
       }catch(e){console.error('Update failed',e);}
     }
 
-    // --- Fetch + Render ---
     async function fetchBookings(){
       try{
         const resp=await fetch('/api/bookings');
@@ -158,7 +163,7 @@
       tableWrap.innerHTML=html;
     }
 
-    // --- Auto-Ready: persistence helpers ---
+    // Auto-Ready toggle (with persistence)
     function setAutoReadyEnabled(val){
       autoReadyEnabled = !!val;
       localStorage.setItem('autoReadyEnabled', String(autoReadyEnabled));
@@ -166,11 +171,7 @@
       autoToggle.textContent = autoReadyEnabled ? 'Auto-Ready: ON' : 'Auto-Ready: OFF';
       if (autoReadyEnabled) startAutoReady(); else stopAutoReady();
     }
-
-    // --- Auto-Ready Toggle (click) ---
-    autoToggle.addEventListener('click',()=>{
-      setAutoReadyEnabled(!autoReadyEnabled);
-    });
+    autoToggle.addEventListener('click',()=> setAutoReadyEnabled(!autoReadyEnabled));
 
     function startAutoReady(){
       stopAutoReady();
@@ -182,20 +183,15 @@
             updateStatus(b._groupKey,'ready');
           }
         });
-      },30000); // every 30 seconds
+      },30000);
     }
+    function stopAutoReady(){ if(autoReadyTimer){clearInterval(autoReadyTimer);autoReadyTimer=null;} }
 
-    function stopAutoReady(){
-      if(autoReadyTimer){clearInterval(autoReadyTimer);autoReadyTimer=null;}
-    }
-
-    // --- Init ---
-    // Restore persisted toggle on load
+    // Init
     (function initAutoReadyFromStorage(){
       const saved = localStorage.getItem('autoReadyEnabled');
       setAutoReadyEnabled(saved === 'true');
     })();
-
     setInterval(fetchBookings,5000);
     (async function(){await fetchBookings()})();
   </script>
