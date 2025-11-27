@@ -4,6 +4,7 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const fs = require('fs').promises;
+const fssync = require('fs');
 const path = require('path');
 
 const app = express();
@@ -17,14 +18,23 @@ const BASE_URL   = process.env.SISO_BASE_URL || 'https://lsa.siso.co';
 const AUTH_TOKEN = process.env.SISO_AUTH_TOKEN || 'L2Mwz8gUdd';
 const AUTH_KEY   = process.env.SISO_AUTH_KEY   || '13b3dc30-971c-440a-81ee-4f99026d44e7';
 const TECH_PASSWORD = process.env.TECH_PASSWORD || 'tech123';
-
-// Optional debug
 const DEBUG_READY_LOG = String(process.env.DEBUG_READY_LOG || 'false').toLowerCase() === 'true';
 
-const STATUS_FILE   = path.join(__dirname, 'statuses.json');   // tech overrides
-const LISTS_FILE    = path.join(__dirname, 'lists.json');      // category lists
-const READYIN_FILE  = path.join(__dirname, 'readyin.json');    // key -> minutes
+// Writable data dir (Render-safe). You can override with DATA_DIR if you attach a persistent disk.
+const DATA_DIR = process.env.DATA_DIR || '/tmp/siso-data';
+if (!fssync.existsSync(DATA_DIR)) { fssync.mkdirSync(DATA_DIR, { recursive: true }); }
 
+const STATUS_FILE  = path.join(DATA_DIR, 'statuses.json');  // tech overrides
+const LISTS_FILE   = path.join(DATA_DIR, 'lists.json');     // category lists
+const READYIN_FILE = path.join(DATA_DIR, 'readyin.json');   // key -> minutes
+
+// Seed lists.json on first run (optional: adjust as you need)
+const DEFAULT_LISTS = { video:[], sound:[], lighting:[], grip:[] };
+
+/* ===== Sanity log ===== */
+console.log('▶️ Using DATA_DIR:', DATA_DIR);
+
+/* ===== Guards ===== */
 if (!AUTH_TOKEN || !AUTH_KEY) {
   console.error('❌ Missing SISO_AUTH_TOKEN or SISO_AUTH_KEY in .env');
   process.exit(1);
@@ -46,13 +56,12 @@ async function readJson(file, fallback) {
 async function writeJson(file, obj) {
   await fs.writeFile(file, JSON.stringify(obj, null, 2), 'utf8');
 }
-async function readStatuses() { return readJson(STATUS_FILE, {}); }
-async function writeStatuses(o){ return writeJson(STATUS_FILE, o); }
-const DEFAULT_LISTS = { video:[], sound:[], lighting:[], grip:[] };
-async function readLists(){ return readJson(LISTS_FILE, DEFAULT_LISTS); }
-async function writeLists(l){ return writeJson(LISTS_FILE, l); }
-async function readReadyIn(){ return readJson(READYIN_FILE, {}); }
-async function writeReadyIn(o){ return writeJson(READYIN_FILE, o); }
+async function readStatuses()   { return readJson(STATUS_FILE, {}); }
+async function writeStatuses(o) { return writeJson(STATUS_FILE, o); }
+async function readLists()      { return readJson(LISTS_FILE, DEFAULT_LISTS); }
+async function writeLists(l)    { return writeJson(LISTS_FILE, l); }
+async function readReadyIn()    { return readJson(READYIN_FILE, {}); }
+async function writeReadyIn(o)  { return writeJson(READYIN_FILE, o); }
 
 /* ===== Auth for /tech & tech APIs ===== */
 function techAuth(req, res, next) {
@@ -161,6 +170,16 @@ function containsAny(hay, needles){
 
 /* ===== Routes ===== */
 
+// quick health/version endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    ok: true,
+    commit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || 'local',
+    dataDir: DATA_DIR,
+    time: new Date().toISOString()
+  });
+});
+
 // redirect direct file hit to protected route
 app.get(['/tech.html','/public/tech.html'], (req,res)=> res.redirect(302, '/tech'));
 
@@ -197,7 +216,7 @@ app.post('/api/ready-in', techAuth, async (req, res) => {
     }
     const map = await readReadyIn();
     if (minutes <= 0) delete map[key];
-    else map[key] = Math.round(minutes); // store integer
+    else map[key] = Math.round(minutes);
     await writeReadyIn(map);
     res.json({ success:true, key, minutes: map[key] || 0 });
   } catch (e) {
@@ -293,7 +312,6 @@ app.post('/api/update-status', techAuth, async (req, res) => {
     if (!key || !allowed.includes(String(status).toLowerCase()))
       return res.status(400).json({ success:false, error:'Missing key or invalid status' });
 
-    // write override
     const statuses = await readStatuses();
     if (String(status).toLowerCase()==='clear') delete statuses[key];
     else statuses[key] = String(status).toLowerCase();
@@ -317,4 +335,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ SISO dashboard backend running at http://localhost:${PORT}`);
   console.log('🔐 /tech protected with Basic Auth');
+  console.log('📦 Data dir:', DATA_DIR);
 });
