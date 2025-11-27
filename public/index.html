@@ -13,23 +13,17 @@
     th,td{padding:12px;text-align:left;vertical-align:top}
     tr:not(:first-child){border-top:1px solid rgba(255,255,255,0.06)}
 
-    /* Status pills - squarish shape */
     .status{font-weight:600;padding:6px 12px;border-radius:8px;display:inline-block}
     .status.notpicked{background:#6b1f1f;color:#ffecec}
     .status.preparing{background:#6b4d1f;color:#fff8e0}
-    .status.ready{
-      background:#1e4f2d;color:#ffffff;
-      animation: readyGlow 2.8s ease-in-out infinite alternate;
-    }
-    @keyframes readyGlow{
-      from { transform:scale(1);   box-shadow:0 0 0 rgba(0,255,120,0.00); }
-      to   { transform:scale(1.03);box-shadow:0 0 20px rgba(0,255,120,0.40); }
-    }
+    .status.ready{background:#1e4f2d;color:#ffffff;animation:readyGlow 2.8s ease-in-out infinite alternate}
+    @keyframes readyGlow{from{transform:scale(1);box-shadow:0 0 0 rgba(0,255,120,0)}to{transform:scale(1.03);box-shadow:0 0 20px rgba(0,255,120,0.4)}}
 
-    /* Asset pills (pastel/translucent) */
+    .ready-in-note{display:inline-block;margin-left:8px;font-size:12px;opacity:.9;background:rgba(255,255,255,0.08);padding:4px 8px;border-radius:6px}
+
     .asset-pill{display:inline-block;border-radius:8px;padding:6px 10px;margin:3px 4px 0 0;font-weight:600}
     .asset-video{background-color:rgba(128,0,128,0.25); color:#efe8ff}
-    .asset-sound{background-color:rgba(200,50,50,0.25); color:#ffecec} /* darker red */
+    .asset-sound{background-color:rgba(200,50,50,0.25); color:#ffecec}
     .asset-lighting{background-color:rgba(255,235,59,0.45); color:#ffffff}
     .asset-grip{background-color:rgba(0,123,255,0.28); color:#eaf2ff}
     .asset-uncategorised,.asset-uncategorized{background-color:rgba(200,200,200,0.18); color:#e6eef8}
@@ -58,19 +52,6 @@
   </main>
 
   <script>
-    // Fallback only if API doesn't provide category
-    function normalizeCategory(rawCategory, assetName){
-      const s=(rawCategory||'').toString().toLowerCase();
-      const n=(assetName||'').toString().toLowerCase();
-      const has=(w)=>s.includes(w)||n.includes(w);
-      if (['video','sound','lighting','grip','uncategorised','uncategorized'].includes(s)) return s;
-      if (has('camera')||has('lens')||has('a7')||has('fx')||has('fs')) return 'video';
-      if (has('mic')||has('microphone')||has('rode')||has('ntg')||has('shotgun')||has('zoom h')||has('tascam')) return 'sound';
-      if (has('light')||has('aputure')||has('amaran')||has('nanlite')||has('godox')||has('led')) return 'lighting';
-      if (has('tripod')||has('sachtler')||has('manfrotto')||has('smallrig')||has('stand')||has('c-stand')||has('arm')||has('clamp')) return 'grip';
-      return 'uncategorised';
-    }
-
     function statusClass(status){
       const t=(status||'').toLowerCase();
       if (t.includes('ready')) return 'ready';
@@ -87,22 +68,12 @@
 
     function formatTime(dt){if(!dt)return'';const d=new Date(dt);return isNaN(d)?dt:d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
 
-    function classFromCategory(cat, name){
-      // Prefer API category
-      let c = (cat||'').toString().toLowerCase().trim();
-      if (!c) c = normalizeCategory('', name);
-      if (c === 'uncategorized') c = 'uncategorised'; // unify spelling
-      if (!['video','sound','lighting','grip','uncategorised'].includes(c)) c='uncategorised';
-      return c;
-    }
-
     function renderAssets(assets){
       return (assets||[]).map(a=>{
         const name = typeof a==='string'?a:(a.name||'');
-        // TRUST server-provided category first
-        const cat  = (typeof a==='object' && a.category) ? a.category : '';
-        const cls  = classFromCategory(cat, name);
-        return `<span class="asset-pill asset-${cls}" title="${cls}">${name}</span>`;
+        const cat  = (typeof a==='object' && a.category) ? a.category : 'uncategorised';
+        const cls  = ['video','sound','lighting','grip','uncategorised'].includes((cat||'').toLowerCase()) ? cat.toLowerCase() : 'uncategorised';
+        return `<span class="asset-pill asset-${cls}">${name}</span>`;
       }).join('');
     }
 
@@ -120,10 +91,12 @@
         for(const b of pageBookings){
           const time=formatTime(b.startdatetime);
           const cls=statusClass(b.status);
+          const readyNote = (b.status!=='Ready for Collection' && Number(b.readyInMinutes)>0)
+            ? `<span class="ready-in-note">Ready in ${b.readyInMinutes} min</span>` : '';
           html += `<tr>
             <td>${time}</td>
             <td>${b.username}</td>
-            <td><span class="status ${cls}">${b.status}</span></td>
+            <td><span class="status ${cls}">${b.status}</span>${readyNote}</td>
             <td>${renderAssets(b.assets)}</td>
           </tr>`;
         }

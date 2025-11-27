@@ -12,20 +12,12 @@
     th,td{padding:12px;text-align:left;vertical-align:top}
     tr:not(:first-child){border-top:1px solid rgba(255,255,255,0.08)}
 
-    /* Status pills - squarish shape */
     .status{font-weight:600;padding:6px 12px;border-radius:8px;display:inline-block}
     .status.notpicked{background:#6b1f1f;color:#ffecec}
     .status.preparing{background:#6b4d1f;color:#fff8e0}
-    .status.ready{
-      background:#1e4f2d;color:#ffffff;
-      animation: readyGlow 2.8s ease-in-out infinite alternate;
-    }
-    @keyframes readyGlow{
-      from { transform:scale(1);   box-shadow:0 0 0 rgba(0,255,120,0.00); }
-      to   { transform:scale(1.03);box-shadow:0 0 20px rgba(0,255,120,0.40); }
-    }
+    .status.ready{background:#1e4f2d;color:#ffffff;animation:readyGlow 2.8s ease-in-out infinite alternate}
+    @keyframes readyGlow{from{transform:scale(1);box-shadow:0 0 0 rgba(0,255,120,0)}to{transform:scale(1.03);box-shadow:0 0 20px rgba(0,255,120,0.4)}}
 
-    /* Asset pills */
     .asset-pill{display:inline-block;border-radius:8px;padding:6px 10px;margin:3px 4px 0 0;font-weight:600}
     .asset-video{background-color:rgba(128,0,128,0.25); color:#efe8ff}
     .asset-sound{background-color:rgba(200,50,50,0.25); color:#ffecec}
@@ -33,22 +25,21 @@
     .asset-grip{background-color:rgba(0,123,255,0.28); color:#eaf2ff}
     .asset-uncategorised,.asset-uncategorized{background-color:rgba(200,200,200,0.18); color:#f0f0f0}
 
-    /* Buttons */
     button{padding:6px 10px;border-radius:8px;border:0;cursor:pointer;font-weight:700}
     .btn-preparing{background:#f1c232;color:#222}
     .btn-ready{background:#1e4f2d;color:#fff}
     .btn-clear{background:#777;color:#fff}
-    .btn-toggle{background:#333;color:#fff;padding:8px 12px;border-radius:8px;font-weight:600}
-    .btn-toggle.on{background:#1e4f2d;color:#fff;box-shadow:0 0 8px rgba(0,255,100,0.3)}
+
+    .readyin-wrap{display:inline-flex;align-items:center;gap:6px;margin-top:6px}
+    .readyin-chip{font-size:12px;background:rgba(255,255,255,0.08);padding:4px 8px;border-radius:6px}
+    .readyin-btn{padding:4px 8px;border-radius:6px;background:#333;color:#fff}
+    .readyin-btn:active{transform:scale(0.98)}
   </style>
 </head>
 <body>
   <header>
     <h1>Technician Dashboard</h1>
-    <div style="display:flex;align-items:center;gap:10px;">
-      <button id="autoToggle" class="btn-toggle">Auto-Ready: OFF</button>
-      <div id="clock" style="opacity:.9;font-size:13px">Loading...</div>
-    </div>
+    <div id="clock" style="opacity:.9;font-size:13px">Loading...</div>
   </header>
 
   <main style="padding:16px">
@@ -64,36 +55,10 @@
 
   <script>
     let bookings = [];
-    let autoReadyEnabled = false;
-    let autoReadyTimer = null;
-
     const tableWrap = document.getElementById('tableWrap');
     const clockEl = document.getElementById('clock');
-    const autoToggle = document.getElementById('autoToggle');
-
     function updateClock(){clockEl.textContent=new Date().toLocaleString()}
     setInterval(updateClock,1000);updateClock();
-
-    // Fallback only if API doesn't provide category
-    function normalizeCategory(rawCategory, assetName){
-      const s=(rawCategory||'').toString().toLowerCase();
-      const n=(assetName||'').toString().toLowerCase();
-      const has=(w)=>s.includes(w)||n.includes(w);
-      if (['video','sound','lighting','grip','uncategorised','uncategorized'].includes(s)) return s;
-      if (has('camera')||has('lens')||has('a7')||has('fx')||has('fs')) return 'video';
-      if (has('mic')||has('microphone')||has('rode')||has('ntg')||has('shotgun')||has('zoom h')||has('tascam')) return 'sound';
-      if (has('light')||has('aputure')||has('amaran')||has('nanlite')||has('godox')||has('led')) return 'lighting';
-      if (has('tripod')||has('sachtler')||has('manfrotto')||has('smallrig')||has('stand')||has('c-stand')||has('arm')||has('clamp')) return 'grip';
-      return 'uncategorised';
-    }
-
-    function classFromCategory(cat, name){
-      let c = (cat||'').toString().toLowerCase().trim();
-      if (!c) c = normalizeCategory('', name);
-      if (c === 'uncategorized') c = 'uncategorised';
-      if (!['video','sound','lighting','grip','uncategorised'].includes(c)) c='uncategorised';
-      return c;
-    }
 
     function statusClass(status){
       const t=(status||'').toLowerCase();
@@ -102,31 +67,66 @@
       if (t.includes('not')) return 'notpicked';
       return t.replace(/\s+/g,'');
     }
-
     function formatTime(dt){
       if(!dt)return'';
       const d=new Date(dt);
       return isNaN(d)?dt:d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     }
-
     function renderAssets(assets){
       return (assets||[]).map(a=>{
         const name = typeof a==='string'?a:(a.name||'');
-        const cat  = (typeof a==='object' && a.category) ? a.category : '';
-        const cls  = classFromCategory(cat, name);
+        const cat  = (typeof a==='object' && a.category) ? a.category : 'uncategorised';
+        const cls  = ['video','sound','lighting','grip','uncategorised'].includes((cat||'').toLowerCase()) ? cat.toLowerCase() : 'uncategorised';
         return `<span class="asset-pill asset-${cls}" title="${cls}">${name}</span>`;
       }).join('');
     }
 
     async function updateStatus(key,status){
       try{
-        await fetch('/api/update-status',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({key,status})
-        });
+        await fetch('/api/update-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,status})});
         await fetchBookings();
       }catch(e){console.error('Update failed',e);}
+    }
+    async function setReadyIn(key, minutes){
+      try{
+        await fetch('/api/ready-in',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,minutes})});
+        await fetchBookings();
+      }catch(e){console.error('Ready-in update failed',e);}
+    }
+
+    function renderTable(list){
+      let html='<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th><th>Actions</th></tr></thead><tbody>';
+      if(!list.length){html+='<tr><td colspan="5">No bookings for today.</td></tr>'}
+      else{
+        for(const b of list){
+          const time=formatTime(b.startdatetime);
+          const cls=statusClass(b.status);
+          const showReadyInControls = b.status !== 'Ready for Collection';
+          const readyIn = Number(b.readyInMinutes||0);
+
+          html+=`<tr>
+            <td>${time}</td>
+            <td>${b.username}</td>
+            <td><span class="status ${cls}">${b.status}</span></td>
+            <td>${renderAssets(b.assets)}</td>
+            <td>
+              ${b.status==='Not Picked'?`<button class="btn-preparing" onclick="updateStatus('${b._groupKey}','preparing')">Preparing</button>`:''}
+              ${b.status==='Preparing'?`<button class="btn-ready" onclick="updateStatus('${b._groupKey}','ready')">Ready</button>`:''}
+              <button class="btn-clear" onclick="updateStatus('${b._groupKey}','clear')">Clear</button>
+
+              ${showReadyInControls ? `
+                <div class="readyin-wrap">
+                  <span class="readyin-chip">Ready in <b>${readyIn}</b> min</span>
+                  <button class="readyin-btn" onclick="(function(){const v=Math.max(0,${readyIn}-5); setReadyIn('${b._groupKey}',v)})()">–5</button>
+                  <button class="readyin-btn" onclick="setReadyIn('${b._groupKey}', ${readyIn}+5)">+5</button>
+                </div>` : ''
+              }
+            </td>
+          </tr>`;
+        }
+      }
+      html+='</tbody></table>';
+      tableWrap.innerHTML=html;
     }
 
     async function fetchBookings(){
@@ -139,59 +139,6 @@
       }catch(e){console.error('Fetch failed',e);}
     }
 
-    function renderTable(list){
-      let html='<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th><th>Actions</th></tr></thead><tbody>';
-      if(!list.length){html+='<tr><td colspan="5">No bookings for today.</td></tr>'}
-      else{
-        for(const b of list){
-          const time=formatTime(b.startdatetime);
-          const cls=statusClass(b.status);
-          html+=`<tr>
-            <td>${time}</td>
-            <td>${b.username}</td>
-            <td><span class="status ${cls}">${b.status}</span></td>
-            <td>${renderAssets(b.assets)}</td>
-            <td>
-              ${b.status==='Not Picked'?`<button class="btn-preparing" onclick="updateStatus('${b._groupKey}','preparing')">Preparing</button>`:''}
-              ${b.status==='Preparing'?`<button class="btn-ready" onclick="updateStatus('${b._groupKey}','ready')">Ready</button>`:''}
-              <button class="btn-clear" onclick="updateStatus('${b._groupKey}','clear')">Clear</button>
-            </td>
-          </tr>`;
-        }
-      }
-      html+='</tbody></table>';
-      tableWrap.innerHTML=html;
-    }
-
-    // Auto-Ready toggle (with persistence)
-    function setAutoReadyEnabled(val){
-      autoReadyEnabled = !!val;
-      localStorage.setItem('autoReadyEnabled', String(autoReadyEnabled));
-      autoToggle.classList.toggle('on', autoReadyEnabled);
-      autoToggle.textContent = autoReadyEnabled ? 'Auto-Ready: ON' : 'Auto-Ready: OFF';
-      if (autoReadyEnabled) startAutoReady(); else stopAutoReady();
-    }
-    autoToggle.addEventListener('click',()=> setAutoReadyEnabled(!autoReadyEnabled));
-
-    function startAutoReady(){
-      stopAutoReady();
-      autoReadyTimer=setInterval(()=>{
-        const now=new Date();
-        bookings.forEach(b=>{
-          const start=new Date(b.startdatetime);
-          if(start<=now && (b.status==='Not Picked'||b.status==='Preparing')){
-            updateStatus(b._groupKey,'ready');
-          }
-        });
-      },30000);
-    }
-    function stopAutoReady(){ if(autoReadyTimer){clearInterval(autoReadyTimer);autoReadyTimer=null;} }
-
-    // Init
-    (function initAutoReadyFromStorage(){
-      const saved = localStorage.getItem('autoReadyEnabled');
-      setAutoReadyEnabled(saved === 'true');
-    })();
     setInterval(fetchBookings,5000);
     (async function(){await fetchBookings()})();
   </script>
