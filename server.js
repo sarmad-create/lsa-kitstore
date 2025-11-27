@@ -128,14 +128,11 @@ function norm(s){ return (s||'').toString().trim().toLowerCase(); }
 function inList(name, arr) {
   if (!name || !Array.isArray(arr)) return false;
   const n = norm(name);
-  // Exact match first
-  if (arr.some(x => norm(x) === n)) return true;
-  // Fuzzy contains (helpful when list has short names like "A7IV")
-  return arr.some(x => n.includes(norm(x)) || norm(x).includes(n));
+  if (arr.some(x => norm(x) === n)) return true; // exact
+  return arr.some(x => n.includes(norm(x)) || norm(x).includes(n)); // fuzzy
 }
 
 function categoryFromLists(assetName, lists) {
-  // Order matters: first match wins
   if (inList(assetName, lists.video))    return 'video';
   if (inList(assetName, lists.sound))    return 'sound';
   if (inList(assetName, lists.lighting)) return 'lighting';
@@ -187,7 +184,7 @@ app.get('/api/bookings', async (req, res) => {
 
     let rows = data?.response || [];
 
-    // keep only real bookings for today
+    // keep only real bookings for today (exclude "booking request")
     rows = rows.filter(r =>
       r.currentstatus &&
       !String(r.currentstatus).toLowerCase().includes('booking request') &&
@@ -209,32 +206,54 @@ app.get('/api/bookings', async (req, res) => {
       const assetName = r.assetname || '';
       const category  = categoryFromLists(assetName, lists);
 
-      grouped[key].assets.push({ name: assetName, category }); // ← category ONLY from lists.json
+      grouped[key].assets.push({ name: assetName, category });
       grouped[key].statuses.push(String(r.currentstatus).toLowerCase());
     }
 
     // apply technician overrides
     const techOverrides = await readStatuses();
 
+    const collectedKeywords = ['collected','issued','checked out','checked-out','checkedout','returned','complete','completed'];
+    const pickedKeywords    = ['picked','ready','prepared','preparing','staged']; // "ready" treated as picked but NOT collected
+
     const bookings = Object.values(grouped).map(g => {
-      const pickedKeywords = ['picked','ready','collected','complete','completed','returned','issued'];
-      const pickedOrReady = g.statuses.filter(s => pickedKeywords.some(k => s.includes(k))).length;
-      const total = g.statuses.length;
+      const statusesLower = g.statuses.map(s => String(s).toLowerCase());
+
+      const countCollected = statusesLower.filter(s => collectedKeywords.some(k => s.includes(k))).length;
+      const countPicked    = statusesLower.filter(s =>
+        pickedKeywords.some(k => s.includes(k)) || collectedKeywords.some(k => s.includes(k))
+      ).length; // picked OR collected count as "picked" for progress
+      const total = statusesLower.length;
+
+      // If ALL items are collected -> hide this booking later
+      const allCollected = total > 0 && countCollected === total;
+
+      // Determine auto status (ignoring override for now)
       let status = 'Not Picked';
-      if (pickedOrReady === 0) status = 'Not Picked';
-      else if (pickedOrReady < total) status = 'Preparing';
+      if (countPicked === 0) status = 'Not Picked';
+      else if (countPicked < total) status = 'Preparing';
       else status = 'Ready for Collection';
 
+      // Apply technician override (but don't override SISO-collected -> those will be filtered)
       const key = makeGroupKey(g.username, g.startdatetime);
-      if (techOverrides[key]) {
+      if (!allCollected && techOverrides[key]) {
         const o = String(techOverrides[key]).toLowerCase();
         if (o==='preparing') status='Preparing';
         else if (o==='ready') status='Ready for Collection';
         else if (o==='notpicked' || o==='not picked') status='Not Picked';
       }
 
-      return { username: g.username, startdatetime: g.startdatetime, assets: g.assets, status, _groupKey: key };
-    });
+      return {
+        username: g.username,
+        startdatetime: g.startdatetime,
+        assets: g.assets,
+        status,
+        _groupKey: key,
+        _allCollected: allCollected
+      };
+    })
+    // ⛔️ Final filter: drop groups whose items are ALL collected in SISO
+    .filter(b => !b._allCollected);
 
     res.json({ success: true, bookings });
   } catch (e) {
