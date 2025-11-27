@@ -20,21 +20,19 @@ const AUTH_KEY   = process.env.SISO_AUTH_KEY   || '13b3dc30-971c-440a-81ee-4f990
 const TECH_PASSWORD = process.env.TECH_PASSWORD || 'tech123';
 const DEBUG_READY_LOG = String(process.env.DEBUG_READY_LOG || 'false').toLowerCase() === 'true';
 
-// Writable data dir (Render-safe). You can override with DATA_DIR if you attach a persistent disk.
+// Writable data dir (Render-safe). Override with DATA_DIR if you mount a disk.
 const DATA_DIR = process.env.DATA_DIR || '/tmp/siso-data';
 if (!fssync.existsSync(DATA_DIR)) { fssync.mkdirSync(DATA_DIR, { recursive: true }); }
 
 const STATUS_FILE  = path.join(DATA_DIR, 'statuses.json');  // tech overrides
-const LISTS_FILE   = path.join(DATA_DIR, 'lists.json');     // category lists
-const READYIN_FILE = path.join(DATA_DIR, 'readyin.json');   // key -> minutes
+const LISTS_FILE   = path.join(DATA_DIR, 'lists.json');     // category lists (optional overrides)
+const READYIN_FILE = path.join(DATA_DIR, 'readyin.json');   // key -> minutes hint
 
-// Seed lists.json on first run (optional: adjust as you need)
+// Seed lists.json on first run (if not present)
 const DEFAULT_LISTS = { video:[], sound:[], lighting:[], grip:[] };
 
-/* ===== Sanity log ===== */
 console.log('▶️ Using DATA_DIR:', DATA_DIR);
 
-/* ===== Guards ===== */
 if (!AUTH_TOKEN || !AUTH_KEY) {
   console.error('❌ Missing SISO_AUTH_TOKEN or SISO_AUTH_KEY in .env');
   process.exit(1);
@@ -137,20 +135,59 @@ function makeGroupKey(username, startdatetime) {
   return `${(username||'Unknown').trim()}_${(startdatetime||'Unknown').trim()}`;
 }
 
-/* ===== Category from lists.json ===== */
+/* ===== Category logic (dynamic + optional lists.json override) ===== */
 function norm(s){ return (s||'').toString().trim().toLowerCase(); }
+
 function inList(name, arr) {
   if (!name || !Array.isArray(arr)) return false;
   const n = norm(name);
-  if (arr.some(x => norm(x) === n)) return true;
-  return arr.some(x => n.includes(norm(x)) || norm(x).includes(n));
+  if (arr.some(x => norm(x) === n)) return true;   // exact match
+  return arr.some(x => n.includes(norm(x)) || norm(x).includes(n)); // fuzzy
 }
-function categoryFromLists(assetName, lists) {
-  if (inList(assetName, lists.video))    return 'video';
-  if (inList(assetName, lists.sound))    return 'sound';
-  if (inList(assetName, lists.lighting)) return 'lighting';
-  if (inList(assetName, lists.grip))     return 'grip';
+
+// Heuristic category from name if not explicitly listed
+function inferCategoryFromName(assetName) {
+  const n = norm(assetName);
+  const has = (w) => n.includes(w);
+
+  // Video
+  if (has('camera') || has('camcorder') || has('a7') || has('fx3') || has('fx6') || has('fx9') ||
+      has('lens') || has('anamorphic') || has('xeen') || has('g-master') || has('clapper') ||
+      has('monitor') || has('director\'s monitor') || has('vaxis') || has('gopro') || has('hero'))
+    return 'video';
+
+  // Sound
+  if (has('mic') || has('microphone') || has('ntg') || has('rode') || has('zoom ') || has('zoom h') ||
+      has('zoom f') || has('shure') || has('sony radio') || has('ecm') || has('recorder') ||
+      has('podcast') || has('boom pole') || has('blimp') || has('headphones'))
+    return 'sound';
+
+  // Lighting
+  if (has('light') || has('panel') || has('tube') || has('aputure') || has('amaran') || has('novap') ||
+      has('nova p') || has('storm 80c') || has('sky panel') || has('skypanel') || has('dedo') ||
+      has('reflector') || has('softbox') || has('rc60') || has('rc120') || has('m160') || has('rm120'))
+    return 'lighting';
+
+  // Grip
+  if (has('tripod') || has('stand') || has('c-stand') || has('c stand') || has('slider') || has('ronin') ||
+      has('rs 3') || has('rs3') || has('rs4') || has('easyrig') || has('shoulder rig') ||
+      has('shoulder') || has('smallrig') || has('libec') || has('monopod') || has('autopole') ||
+      has('rig') || has('gimbal'))
+    return 'grip';
+
   return 'uncategorised';
+}
+
+// Final category resolver: lists.json override -> heuristics -> uncategorised
+function categoryForAsset(assetName, lists) {
+  const name = assetName || '';
+  // lists.json as explicit override
+  if (inList(name, lists.video))    return 'video';
+  if (inList(name, lists.sound))    return 'sound';
+  if (inList(name, lists.lighting)) return 'lighting';
+  if (inList(name, lists.grip))     return 'grip';
+  // otherwise infer from name
+  return inferCategoryFromName(name);
 }
 
 /* ===== Collected / Picked detectors ===== */
@@ -170,7 +207,7 @@ function containsAny(hay, needles){
 
 /* ===== Routes ===== */
 
-// quick health/version endpoint
+// health/version
 app.get('/health', (req, res) => {
   res.json({
     ok: true,
@@ -252,7 +289,10 @@ app.get('/api/bookings', async (req, res) => {
       if (!grouped[key]) grouped[key] = { username, startdatetime: bucket, assets: [], statuses: [] };
 
       const assetName = r.assetname || '';
-      grouped[key].assets.push({ name: assetName, category: categoryFromLists(assetName, lists) });
+      grouped[key].assets.push({
+        name: assetName,
+        category: categoryForAsset(assetName, lists)  // ⬅ dynamic + lists override
+      });
       grouped[key].statuses.push(String(r.currentstatus).toLowerCase());
     }
 
