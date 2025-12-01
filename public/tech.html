@@ -57,8 +57,12 @@
     let bookings = [];
     const tableWrap = document.getElementById('tableWrap');
     const clockEl = document.getElementById('clock');
-    function updateClock(){clockEl.textContent=new Date().toLocaleString()}
-    setInterval(updateClock,1000);updateClock();
+
+    function updateClock(){
+      clockEl.textContent=new Date().toLocaleString();
+    }
+    setInterval(updateClock,1000);
+    updateClock();
 
     function statusClass(status){
       const t=(status||'').toLowerCase();
@@ -67,40 +71,57 @@
       if (t.includes('not')) return 'notpicked';
       return t.replace(/\s+/g,'');
     }
+
     function formatTime(dt){
-      if(!dt)return'';
+      if(!dt) return '';
       const d=new Date(dt);
-      return isNaN(d)?dt:d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+      return isNaN(d) ? dt : d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     }
+
     function renderAssets(assets){
       return (assets||[]).map(a=>{
-        const name = typeof a==='string'?a:(a.name||'');
+        const name = typeof a==='string' ? a : (a.name||'');
         const cat  = (typeof a==='object' && a.category) ? a.category : 'uncategorised';
-        const cls  = ['video','sound','lighting','grip','uncategorised'].includes((cat||'').toLowerCase()) ? cat.toLowerCase() : 'uncategorised';
+        const valid = ['video','sound','lighting','grip','uncategorised'];
+        const cls  = valid.includes((cat||'').toLowerCase()) ? cat.toLowerCase() : 'uncategorised';
         return `<span class="asset-pill asset-${cls}" title="${cls}">${name}</span>`;
       }).join('');
     }
 
     async function updateStatus(key,status){
       try{
-        await fetch('/api/update-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,status})});
+        await fetch('/api/update-status',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({key,status})
+        });
         await fetchBookings();
-      }catch(e){console.error('Update failed',e);}
+      }catch(e){
+        console.error('Update failed',e);
+      }
     }
+
     async function setReadyIn(key, minutes){
       try{
-        await fetch('/api/ready-in',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,minutes})});
+        await fetch('/api/ready-in',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({key,minutes})
+        });
         await fetchBookings();
-      }catch(e){console.error('Ready-in update failed',e);}
+      }catch(e){
+        console.error('Ready-in update failed',e);
+      }
     }
 
     function renderTable(list){
       let html='<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th><th>Actions</th></tr></thead><tbody>';
-      if(!list.length){html+='<tr><td colspan="5">No bookings for today.</td></tr>'}
-      else{
+      if(!list.length){
+        html+='<tr><td colspan="5">No bookings for today.</td></tr>';
+      }else{
         for(const b of list){
-          const time=formatTime(b.startdatetime);
-          const cls=statusClass(b.status);
+          const time = formatTime(b.startdatetime);
+          const cls  = statusClass(b.status);
           const showReadyInControls = b.status !== 'Ready for Collection';
           const readyIn = Number(b.readyInMinutes||0);
 
@@ -110,8 +131,14 @@
             <td><span class="status ${cls}">${b.status}</span></td>
             <td>${renderAssets(b.assets)}</td>
             <td>
-              ${b.status==='Not Picked'?`<button class="btn-preparing" onclick="updateStatus('${b._groupKey}','preparing')">Preparing</button>`:''}
-              ${b.status==='Preparing'?`<button class="btn-ready" onclick="updateStatus('${b._groupKey}','ready')">Ready</button>`:''}
+              ${b.status==='Not Picked'
+                ? `<button class="btn-preparing" onclick="updateStatus('${b._groupKey}','preparing')">Preparing</button>`
+                : ''
+              }
+              ${b.status==='Preparing'
+                ? `<button class="btn-ready" onclick="updateStatus('${b._groupKey}','ready')">Ready</button>`
+                : ''
+              }
               <button class="btn-clear" onclick="updateStatus('${b._groupKey}','clear')">Clear</button>
 
               ${showReadyInControls ? `
@@ -131,16 +158,20 @@
 
     async function fetchBookings(){
       try{
-        const resp=await fetch('/api/bookings');
-        const data=await resp.json();
-        bookings=(data.success&&Array.isArray(data.bookings))?data.bookings:[];
+        const resp = await fetch('/api/bookings');
+        const data = await resp.json();
+        bookings = (data.success && Array.isArray(data.bookings)) ? data.bookings : [];
         bookings.sort((a,b)=>new Date(a.startdatetime)-new Date(b.startdatetime));
         renderTable(bookings);
-      }catch(e){console.error('Fetch failed',e);}
+      }catch(e){
+        console.error('Fetch failed',e);
+      }
     }
 
     setInterval(fetchBookings,5000);
-    (async function(){await fetchBookings()})();
+    (async function(){
+      await fetchBookings();
+    })();
   </script>
 </body>
 </html>
