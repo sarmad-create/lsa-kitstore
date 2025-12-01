@@ -5,7 +5,26 @@
   <title>Technician Dashboard</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;background:#1a1024;color:#f0e6ff}
+    /* Rotate whole dashboard 90deg counter-clockwise */
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden; /* prevent scrollbars on rotation */
+      height: 100%;
+      width: 100%;
+    }
+    .rotate-90-ccw {
+      position: fixed;
+      top: 100%;          /* start at bottom, then rotate up */
+      left: 0;
+      transform-origin: left top;
+      transform: rotate(-90deg);
+      width: 100vh;       /* swapped because of rotation */
+      height: 100vw;
+    }
+
+    /* ---- Original styling ---- */
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;background:#1a1024;color:#f0e6ff}
     header{padding:16px;background:#2c1952;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
     h1{margin:0;font-size:20px}
     table{width:100%;border-collapse:collapse}
@@ -37,21 +56,23 @@
   </style>
 </head>
 <body>
-  <header>
-    <h1>Technician Dashboard</h1>
-    <div id="clock" style="opacity:.9;font-size:13px">Loading...</div>
-  </header>
+  <div class="rotate-90-ccw">
+    <header>
+      <h1>Technician Dashboard</h1>
+      <div id="clock" style="opacity:.9;font-size:13px">Loading...</div>
+    </header>
 
-  <main style="padding:16px">
-    <div class="legend">
-      <span class="asset-pill asset-video">Video</span>
-      <span class="asset-pill asset-sound">Sound</span>
-      <span class="asset-pill asset-lighting">Lighting</span>
-      <span class="asset-pill asset-grip">Grip</span>
-      <span class="asset-pill asset-uncategorised">Uncategorised</span>
-    </div>
-    <div id="tableWrap"></div>
-  </main>
+    <main style="padding:16px">
+      <div class="legend">
+        <span class="asset-pill asset-video">Video</span>
+        <span class="asset-pill asset-sound">Sound</span>
+        <span class="asset-pill asset-lighting">Lighting</span>
+        <span class="asset-pill asset-grip">Grip</span>
+        <span class="asset-pill asset-uncategorised">Uncategorised</span>
+      </div>
+      <div id="tableWrap"></div>
+    </main>
+  </div>
 
   <script>
     let bookings = [];
