@@ -43,7 +43,11 @@
     .status.notpicked{background:#6b1f1f;color:#ffecec}
     .status.preparing{background:#6b4d1f;color:#fff8e0}
     .status.ready{background:#1e4f2d;color:#ffffff;animation:readyGlow 2.8s ease-in-out infinite alternate}
-    @keyframes readyGlow{from{transform:scale(1);box-shadow:0 0 0 rgba(0,255,120,0)}to{transform:scale(1.03);box-shadow:0 0 20px rgba(0,255,120,0.4)}}
+
+    @keyframes readyGlow{
+      from{transform:scale(1);box-shadow:0 0 0 rgba(0,255,120,0)}
+      to{transform:scale(1.03);box-shadow:0 0 20px rgba(0,255,120,0.4)}
+    }
 
     .asset-pill{
       display:inline-block;
@@ -58,7 +62,7 @@
     .asset-grip{background-color:rgba(0,123,255,0.28); color:#eaf2ff}
     .asset-uncategorised{background-color:rgba(200,200,200,0.18); color:#f0f0f0}
 
-    /* Top Today/Tomorrow selector */
+    /* Today / Tomorrow buttons */
     .top-btn {
       padding:12px 26px;
       border-radius:30px;
@@ -114,16 +118,15 @@
       pointer-events:none !important;
     }
 
-    /* Toolbar container (top-right) */
+    /* TOP-RIGHT TOOLBAR */
     #annotateTools {
       position:fixed;
       top:10px;
-      right:300px;
+      right:300px;  /* You said this placement is perfect */
       z-index:1000000;
       pointer-events:none;
     }
 
-    /* Rotated inner section */
     #annotateToolsInner {
       transform: rotate(-90deg);
       transform-origin: top right;
@@ -158,7 +161,7 @@
   <!-- Annotation Canvas -->
   <canvas id="annotateCanvas"></canvas>
 
-  <!-- Top-Right Rotated Annotation Toolbar -->
+  <!-- Toolbar -->
   <div id="annotateTools">
     <div id="annotateToolsInner">
 
@@ -179,9 +182,9 @@
   </div>
 
   <script>
-    /* =============================
-       Annotation System + Undo
-       ============================= */
+    /* ======================
+       Annotation + Optimized Performance
+       ====================== */
 
     const canvas = document.getElementById("annotateCanvas");
     const ctx = canvas.getContext("2d");
@@ -192,9 +195,20 @@
     let strokeColor = "yellow";
     let strokeWidth = 5;
 
-    /* Undo stack */
     let undoStack = [];
 
+    /* UPSCALE FACTOR */
+    const scale = 0.75;
+
+    function resizeCanvas(){
+      canvas.width = window.innerWidth * scale;
+      canvas.height = window.innerHeight * scale;
+      ctx.scale(scale, scale);
+    }
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+
+    /* Save state AFTER a stroke finishes */
     function saveState() {
       undoStack.push(canvas.toDataURL());
       if (undoStack.length > 40) undoStack.shift();
@@ -203,20 +217,13 @@
     function undoStroke() {
       if (undoStack.length === 0) return;
       const img = new Image();
-      const lastState = undoStack.pop();
-      img.src = lastState;
+      const last = undoStack.pop();
+      img.src = last;
       img.onload = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
       };
     }
-
-    function resizeCanvas(){
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    }
-    window.addEventListener("resize", resizeCanvas);
-    resizeCanvas();
 
     function setColor(c){
       strokeColor = c;
@@ -238,34 +245,50 @@
       canvas.classList.toggle("hiddenCanvas");
     }
 
+    /* Throttled drawing */
+    let lastDraw = 0;
+    const DRAW_INTERVAL = 10; // ms
+
     canvas.addEventListener("pointerdown", e => {
-      saveState();
       drawing = true;
       ctx.beginPath();
-      ctx.moveTo(e.clientX, e.clientY);
+
+      const x = e.clientX / scale;
+      const y = e.clientY / scale;
+
+      ctx.moveTo(x, y);
     });
 
     canvas.addEventListener("pointermove", e => {
+      const now = performance.now();
+      if (now - lastDraw < DRAW_INTERVAL) return;
+      lastDraw = now;
+
       if(!drawing) return;
 
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
-
       ctx.lineWidth = erasing ? 24 : strokeWidth;
 
       if (!erasing) ctx.globalCompositeOperation = "source-over";
 
       ctx.strokeStyle = erasing ? "rgba(0,0,0,1)" : strokeColor;
 
-      ctx.lineTo(e.clientX, e.clientY);
+      const x = e.clientX / scale;
+      const y = e.clientY / scale;
+
+      ctx.lineTo(x, y);
       ctx.stroke();
     });
 
-    canvas.addEventListener("pointerup", ()=> drawing=false);
-    canvas.addEventListener("pointercancel", ()=> drawing=false);
+    canvas.addEventListener("pointerup", () => {
+      drawing = false;
+      saveState();
+    });
+    canvas.addEventListener("pointercancel", () => drawing = false);
   </script>
 
-  <!-- ORIGINAL DASHBOARD -->
+  <!-- ORIGINAL DASHBOARD BELOW -->
   <div class="rotate-90-ccw">
     <header>
       <h1>Technician Dashboard</h1>
@@ -291,9 +314,7 @@
   </div>
 
   <script>
-    /* =============================
-       ORIGINAL DASHBOARD LOGIC
-       ============================= */
+    /* Dashboard Logic + Polling Optimization */
     let bookings = [];
     let dayMode = "today";
 
@@ -393,7 +414,8 @@
       renderTable(bookings);
     }
 
-    setInterval(fetchBookings,5000);
+    /* Poll every 15 seconds instead of 5 */
+    setInterval(fetchBookings,15000);
     fetchBookings();
   </script>
 
