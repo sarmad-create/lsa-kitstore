@@ -50,24 +50,26 @@
     .asset-grip{background-color:rgba(0,123,255,0.28); color:#eaf2ff}
     .asset-uncategorised,.asset-uncategorized{background-color:rgba(200,200,200,0.18); color:#f0f0f0}
 
-    /* Top buttons */
+    /* 🔥 TOP FILTER BUTTONS (updated) */
     .top-btn {
-      padding:10px 18px;
-      border-radius:25px;
-      border:0;
+      padding:12px 26px;
+      border-radius:30px;
+      border:2px solid white;
       cursor:pointer;
       font-weight:700;
-      background:#555;
-      color:white;
-      font-size:16px;
+      background:white;
+      color:black;
+      font-size:18px;
       transition:0.15s;
     }
     .top-btn.selected {
-      background:#1e4f2d;
-      box-shadow:0 0 10px rgba(0,255,100,0.4);
+      background:#f1c232;   /* yellow */
+      border-color:#f1c232;
+      color:black;
+      box-shadow:0 0 10px rgba(255,200,50,0.6);
     }
 
-    /* Action buttons → PILL SHAPED */
+    /* Action buttons (already pills) */
     button {
       border-radius:25px !important;
       padding:6px 14px;
@@ -75,18 +77,15 @@
       cursor:pointer;
       font-weight:700;
     }
-
     .btn-preparing{background:#f1c232;color:#222}
     .btn-ready{background:#1e4f2d;color:#fff}
     .btn-clear{background:#777;color:#fff}
 
-    /* Ready in controls */
     .readyin-wrap{display:inline-flex;align-items:center;gap:6px;margin-top:6px}
     .readyin-chip{font-size:12px;background:rgba(255,255,255,0.08);padding:4px 8px;border-radius:25px}
     .readyin-btn{padding:6px 12px;border-radius:25px;background:#333;color:#fff;font-weight:700}
     .readyin-btn:active{transform:scale(0.98)}
 
-    /* Bigger date/time */
     #clock {
       font-size:20px !important;
       font-weight:600;
@@ -99,7 +98,7 @@
     <header>
       <h1>Technician Dashboard</h1>
 
-      <div style="display:flex; gap:10px;">
+      <div style="display:flex; gap:12px;">
         <button id="btnToday" onclick="switchDay('today')" class="top-btn selected">Today</button>
         <button id="btnTomorrow" onclick="switchDay('tomorrow')" class="top-btn">Tomorrow</button>
       </div>
@@ -135,8 +134,11 @@
 
     function switchDay(mode){
       dayMode = mode;
+
+      // highlight selected filter
       btnToday.classList.toggle("selected", mode === "today");
       btnTomorrow.classList.toggle("selected", mode === "tomorrow");
+
       fetchBookings();
     }
 
