@@ -5,27 +5,33 @@
   <title>Technician Dashboard</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    /* Rotate whole dashboard 90deg counter-clockwise */
     html, body {
       margin: 0;
       padding: 0;
-      overflow: hidden; /* prevent scrollbars on rotation */
+      overflow: hidden;
       height: 100%;
       width: 100%;
     }
     .rotate-90-ccw {
       position: fixed;
-      top: 100%;          /* start at bottom, then rotate up */
+      top: 100%;
       left: 0;
       transform-origin: left top;
       transform: rotate(-90deg);
-      width: 100vh;       /* swapped because of rotation */
+      width: 100vh;
       height: 100vw;
     }
 
-    /* ---- Original styling ---- */
     body{font-family:system-ui,Segoe UI,Roboto,Arial;background:#1a1024;color:#f0e6ff}
-    header{padding:16px;background:#2c1952;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+    header{
+      padding:16px;
+      background:#2c1952;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:10px;
+    }
     h1{margin:0;font-size:20px}
     table{width:100%;border-collapse:collapse}
     th,td{padding:12px;text-align:left;vertical-align:top}
@@ -44,22 +50,61 @@
     .asset-grip{background-color:rgba(0,123,255,0.28); color:#eaf2ff}
     .asset-uncategorised,.asset-uncategorized{background-color:rgba(200,200,200,0.18); color:#f0f0f0}
 
-    button{padding:6px 10px;border-radius:8px;border:0;cursor:pointer;font-weight:700}
+    /* Top buttons */
+    .top-btn {
+      padding:10px 18px;
+      border-radius:25px;
+      border:0;
+      cursor:pointer;
+      font-weight:700;
+      background:#555;
+      color:white;
+      font-size:16px;
+      transition:0.15s;
+    }
+    .top-btn.selected {
+      background:#1e4f2d;
+      box-shadow:0 0 10px rgba(0,255,100,0.4);
+    }
+
+    /* Action buttons → PILL SHAPED */
+    button {
+      border-radius:25px !important;
+      padding:6px 14px;
+      border:0;
+      cursor:pointer;
+      font-weight:700;
+    }
+
     .btn-preparing{background:#f1c232;color:#222}
     .btn-ready{background:#1e4f2d;color:#fff}
     .btn-clear{background:#777;color:#fff}
 
+    /* Ready in controls */
     .readyin-wrap{display:inline-flex;align-items:center;gap:6px;margin-top:6px}
-    .readyin-chip{font-size:12px;background:rgba(255,255,255,0.08);padding:4px 8px;border-radius:6px}
-    .readyin-btn{padding:4px 8px;border-radius:6px;background:#333;color:#fff}
+    .readyin-chip{font-size:12px;background:rgba(255,255,255,0.08);padding:4px 8px;border-radius:25px}
+    .readyin-btn{padding:6px 12px;border-radius:25px;background:#333;color:#fff;font-weight:700}
     .readyin-btn:active{transform:scale(0.98)}
+
+    /* Bigger date/time */
+    #clock {
+      font-size:20px !important;
+      font-weight:600;
+      opacity:.9;
+    }
   </style>
 </head>
 <body>
   <div class="rotate-90-ccw">
     <header>
       <h1>Technician Dashboard</h1>
-      <div id="clock" style="opacity:.9;font-size:13px">Loading...</div>
+
+      <div style="display:flex; gap:10px;">
+        <button id="btnToday" onclick="switchDay('today')" class="top-btn selected">Today</button>
+        <button id="btnTomorrow" onclick="switchDay('tomorrow')" class="top-btn">Tomorrow</button>
+      </div>
+
+      <div id="clock">Loading...</div>
     </header>
 
     <main style="padding:16px">
@@ -76,14 +121,24 @@
 
   <script>
     let bookings = [];
+    let dayMode = "today";
+
     const tableWrap = document.getElementById('tableWrap');
     const clockEl = document.getElementById('clock');
+    const btnToday = document.getElementById("btnToday");
+    const btnTomorrow = document.getElementById("btnTomorrow");
 
     function updateClock(){
       clockEl.textContent=new Date().toLocaleString();
     }
-    setInterval(updateClock,1000);
-    updateClock();
+    setInterval(updateClock,1000); updateClock();
+
+    function switchDay(mode){
+      dayMode = mode;
+      btnToday.classList.toggle("selected", mode === "today");
+      btnTomorrow.classList.toggle("selected", mode === "tomorrow");
+      fetchBookings();
+    }
 
     function statusClass(status){
       const t=(status||'').toLowerCase();
@@ -138,7 +193,7 @@
     function renderTable(list){
       let html='<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th><th>Actions</th></tr></thead><tbody>';
       if(!list.length){
-        html+='<tr><td colspan="5">No bookings for today.</td></tr>';
+        html+='<tr><td colspan="5">No bookings for selected day.</td></tr>';
       }else{
         for(const b of list){
           const time = formatTime(b.startdatetime);
@@ -179,7 +234,7 @@
 
     async function fetchBookings(){
       try{
-        const resp = await fetch('/api/bookings');
+        const resp = await fetch(`/api/bookings?day=${dayMode}`);
         const data = await resp.json();
         bookings = (data.success && Array.isArray(data.bookings)) ? data.bookings : [];
         bookings.sort((a,b)=>new Date(a.startdatetime)-new Date(b.startdatetime));
@@ -190,9 +245,7 @@
     }
 
     setInterval(fetchBookings,5000);
-    (async function(){
-      await fetchBookings();
-    })();
+    (async function(){ await fetchBookings(); })();
   </script>
 </body>
 </html>

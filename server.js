@@ -12,13 +12,12 @@ app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
 
-/* ===== ENV ===== */
 const BASE_URL   = process.env.SISO_BASE_URL || 'https://lsa.siso.co';
 const AUTH_TOKEN = process.env.SISO_AUTH_TOKEN || 'L2Mwz8gUdd';
 const AUTH_KEY   = process.env.SISO_AUTH_KEY   || '13b3dc30-971c-440a-81ee-4f99026d44e7';
 
-const STATUS_FILE = path.join(__dirname, 'statuses.json');
-const LISTS_FILE  = path.join(__dirname, 'lists.json');
+const STATUS_FILE  = path.join(__dirname, 'statuses.json');
+const LISTS_FILE   = path.join(__dirname, 'lists.json');
 const READYIN_FILE = path.join(__dirname, 'readyin.json');
 
 if (!AUTH_TOKEN || !AUTH_KEY) {
@@ -26,7 +25,6 @@ if (!AUTH_TOKEN || !AUTH_KEY) {
   process.exit(1);
 }
 
-/* ===== JSON HELPERS ===== */
 async function readJson(file, fallback) {
   try {
     const raw = await fs.readFile(file, 'utf8');
@@ -43,18 +41,17 @@ async function writeJson(file, obj) {
   await fs.writeFile(file, JSON.stringify(obj, null, 2), 'utf8');
 }
 
-async function readStatuses() { return readJson(STATUS_FILE, {}); }
-async function writeStatuses(o){ return writeJson(STATUS_FILE, o); }
+async function readStatuses()   { return readJson(STATUS_FILE, {}); }
+async function writeStatuses(o) { return writeJson(STATUS_FILE, o); }
 
-async function readLists() { 
-  return readJson(LISTS_FILE, { video:[], sound:[], lighting:[], grip:[] }); 
+async function readLists() {
+  return readJson(LISTS_FILE, { video:[], sound:[], lighting:[], grip:[] });
 }
-async function writeLists(l){ return writeJson(LISTS_FILE, l); }
+async function writeLists(l)   { return writeJson(LISTS_FILE, l); }
 
-async function readReadyIn() { return readJson(READYIN_FILE, {}); }
-async function writeReadyIn(o){ return writeJson(READYIN_FILE, o); }
+async function readReadyIn()   { return readJson(READYIN_FILE, {}); }
+async function writeReadyIn(o) { return writeJson(READYIN_FILE, o); }
 
-/* ===== JWT CACHE ===== */
 let cachedJwt = null, jwtExpiry = 0;
 
 async function getJwt() {
@@ -79,7 +76,6 @@ async function getJwt() {
   return cachedJwt;
 }
 
-/* ===== DATE HELPERS ===== */
 function formatDateForApi(d) {
   const dd=String(d.getDate()).padStart(2,'0');
   const mm=String(d.getMonth()+1).padStart(2,'0');
@@ -124,7 +120,6 @@ function makeGroupKey(username, startdatetime) {
   return `${(username||'Unknown').trim()}_${(startdatetime||'Unknown').trim()}`;
 }
 
-/* ===== CATEGORY ANALYSIS ===== */
 function norm(s){ return (s||'').toString().trim().toLowerCase(); }
 
 function inList(name, arr) {
@@ -144,65 +139,64 @@ function categoryFromLists(assetName, lists) {
   return 'uncategorised';
 }
 
-/* ============================================================
-      🔒 HIDDEN TECH ROUTE (security through obscurity)
-   ============================================================ */
-
 const TECH_PATH = "/tech-94f02c77b8c149e8bb3b0f72d8f93fa2";
 
-/* Redirect old paths → new hidden path */
 app.get(['/tech','/tech.html','/public/tech.html'], (req,res) => {
   res.redirect(302, TECH_PATH);
 });
 
-/* Serve the technician page */
 app.get(TECH_PATH, (req,res) => {
   res.sendFile(path.join(__dirname, 'public', 'tech.html'));
 });
 
-/* PUBLIC frontend */
 app.use('/', express.static(path.join(__dirname, 'public')));
 
-/* ============================================================
-   🔧 LISTS API (public GET, used internally)
-   ============================================================ */
 app.get('/api/lists', async (_req,res)=>{
   const lists = await readLists();
   res.json({ success:true, lists });
 });
 
-/* ============================================================
-   🔧 BOOKINGS (public dashboard & tech dashboard)
-   ============================================================ */
 app.get('/api/bookings', async(req,res)=>{
   try{
-    const today = new Date();
+    const day = (req.query.day || 'today').toLowerCase();
+    const baseDate = new Date();
+
+    if (day === 'tomorrow') {
+      baseDate.setDate(baseDate.getDate() + 1);
+    }
+
     const jwt = await getJwt();
 
     const { data } = await axios.get(`${BASE_URL}/scripts/api/v1/listbookings`, {
       headers:{ Accept:'application/json', Authorization:`Bearer ${jwt}` },
-      params:{ date:formatDateForApi(today), limit:1000, _:Date.now() },
+      params:{ date:formatDateForApi(baseDate), limit:1000, _:Date.now() },
       timeout:12000
     });
 
     let rows = data?.response || [];
 
-    rows = rows.filter(r =>
-      r.currentstatus &&
-      !String(r.currentstatus).toLowerCase().includes('booking request') &&
-      isSameDayStart(r.startdatetime, today)
-    );
+    rows = rows.filter(r => {
+      const st = String(r.currentstatus || '').toLowerCase();
+      if (!st) return false;
+      if (st.includes('booking request')) return false;
+      if (st.includes('collected')) return false;
+      if (st.includes('returned')) return false;
+      if (st.includes('complete')) return false;
+      if (st.includes('issued')) return false;
+      if (st.includes('on loan')) return false;
+      return isSameDayStart(r.startdatetime, baseDate);
+    });
 
-    const lists = await readLists();
+    const lists     = await readLists();
     const overrides = await readStatuses();
-    const readyIn = await readReadyIn();
+    const readyIn   = await readReadyIn();
 
     const grouped = {};
 
     for(const r of rows){
-      const user = (r.username || r.userbarcode || 'Unknown').trim();
+      const user   = (r.username || r.userbarcode || 'Unknown').trim();
       const bucket = getTimeBucket(r.startdatetime,5);
-      const key = makeGroupKey(user, bucket);
+      const key    = makeGroupKey(user, bucket);
 
       if(!grouped[key])
         grouped[key] = { username:user, startdatetime:bucket, assets:[], statuses:[] };
@@ -217,7 +211,7 @@ app.get('/api/bookings', async(req,res)=>{
       let status = 'Not Picked';
       const lower = g.statuses;
 
-      const pickedKeywords=['picked','ready','collected','returned','issued','complete','completed'];
+      const pickedKeywords = ['picked','prepped','prepared','preparing','ready'];
       const picked = lower.filter(s => pickedKeywords.some(k=>s.includes(k))).length;
       const total  = lower.length;
 
@@ -231,7 +225,7 @@ app.get('/api/bookings', async(req,res)=>{
         const o = overrides[key].toLowerCase();
         if(o==='preparing') status='Preparing';
         if(o==='ready')     status='Ready for Collection';
-        if(o==='notpicked') status='Not Picked';
+        if(o==='notpicked' || o==='not picked') status='Not Picked';
       }
 
       return {
@@ -252,9 +246,6 @@ app.get('/api/bookings', async(req,res)=>{
   }
 });
 
-/* ============================================================
-   🔧 TECH UPDATE STATUS (no password)
-   ============================================================ */
 app.post('/api/update-status', async(req,res)=>{
   try{
     const { key, status } = req.body || {};
@@ -276,9 +267,6 @@ app.post('/api/update-status', async(req,res)=>{
   }
 });
 
-/* ============================================================
-   🔧 TECH: READY IN MINUTES
-   ============================================================ */
 app.post('/api/ready-in', async(req,res)=>{
   try{
     const { key, minutes } = req.body || {};
@@ -293,9 +281,6 @@ app.post('/api/ready-in', async(req,res)=>{
   }
 });
 
-/* ============================================================
-   START SERVER
-   ============================================================ */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, ()=> {
   console.log(`✅ Server running on http://localhost:${PORT}`);
