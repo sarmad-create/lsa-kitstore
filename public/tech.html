@@ -4,29 +4,38 @@
   <meta charset="utf-8" />
   <title>Technician Dashboard</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+
   <style>
-    /* Rotate whole dashboard 90deg counter-clockwise */
     html, body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden; /* prevent scrollbars on rotation */
-      height: 100%;
-      width: 100%;
+      margin:0; padding:0;
+      overflow:hidden;
+      height:100%; width:100%;
     }
+
+    /* Rotate entire dashboard 90deg CCW */
     .rotate-90-ccw {
       position: fixed;
-      top: 100%;          /* start at bottom, then rotate up */
+      top: 100%;
       left: 0;
       transform-origin: left top;
       transform: rotate(-90deg);
-      width: 100vh;       /* swapped because of rotation */
+      width: 100vh;
       height: 100vw;
+      pointer-events:auto;
     }
 
-    /* ---- Original styling ---- */
     body{font-family:system-ui,Segoe UI,Roboto,Arial;background:#1a1024;color:#f0e6ff}
-    header{padding:16px;background:#2c1952;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+    header{
+      padding:16px;
+      background:#2c1952;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:10px;
+    }
     h1{margin:0;font-size:20px}
+
     table{width:100%;border-collapse:collapse}
     th,td{padding:12px;text-align:left;vertical-align:top}
     tr:not(:first-child){border-top:1px solid rgba(255,255,255,0.08)}
@@ -37,162 +46,388 @@
     .status.ready{background:#1e4f2d;color:#ffffff;animation:readyGlow 2.8s ease-in-out infinite alternate}
     @keyframes readyGlow{from{transform:scale(1);box-shadow:0 0 0 rgba(0,255,120,0)}to{transform:scale(1.03);box-shadow:0 0 20px rgba(0,255,120,0.4)}}
 
-    .asset-pill{display:inline-block;border-radius:8px;padding:6px 10px;margin:3px 4px 0 0;font-weight:600}
-    .asset-video{background-color:rgba(128,0,128,0.25); color:#efe8ff}
-    .asset-sound{background-color:rgba(200,50,50,0.25); color:#ffecec}
-    .asset-lighting{background-color:rgba(255,235,59,0.45); color:#ffffff}
-    .asset-grip{background-color:rgba(0,123,255,0.28); color:#eaf2ff}
-    .asset-uncategorised,.asset-uncategorized{background-color:rgba(200,200,200,0.18); color:#f0f0f0}
+    .asset-pill{
+      display:inline-block;
+      border-radius:8px;
+      padding:6px 10px;
+      margin:3px 4px 0 0;
+      font-weight:600;
+    }
+    .asset-video{background:rgba(128,0,128,0.25); color:#efe8ff}
+    .asset-sound{background:rgba(200,50,50,0.25); color:#ffecec}
+    .asset-lighting{background:rgba(255,235,59,0.45); color:#ffffff}
+    .asset-grip{background:rgba(0,123,255,0.28); color:#eaf2ff}
+    .asset-uncategorised{background:rgba(200,200,200,0.18); color:#f0f0f0}
 
-    button{padding:6px 10px;border-radius:8px;border:0;cursor:pointer;font-weight:700}
+    .top-btn {
+      padding:10px 22px;
+      border-radius:30px;
+      border:2px solid white;
+      cursor:pointer;
+      font-weight:700;
+      background:white;
+      color:black;
+      font-size:16px;
+      transition:.15s;
+    }
+    .top-btn.selected {
+      background:#f1c232;
+      border-color:#f1c232;
+      color:black;
+      box-shadow:0 0 10px rgba(255,200,50,0.6);
+    }
+
+    button {
+      border-radius:20px !important;
+      padding:6px 12px;
+      border:0;
+      cursor:pointer;
+      font-weight:700;
+      font-size:14px;
+    }
     .btn-preparing{background:#f1c232;color:#222}
     .btn-ready{background:#1e4f2d;color:#fff}
     .btn-clear{background:#777;color:#fff}
 
-    .readyin-wrap{display:inline-flex;align-items:center;gap:6px;margin-top:6px}
-    .readyin-chip{font-size:12px;background:rgba(255,255,255,0.08);padding:4px 8px;border-radius:6px}
-    .readyin-btn{padding:4px 8px;border-radius:6px;background:#333;color:#fff}
-    .readyin-btn:active{transform:scale(0.98)}
+    .readyin-wrap{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      margin-top:6px
+    }
+    .readyin-chip{
+      font-size:12px;
+      background:rgba(255,255,255,0.08);
+      padding:4px 8px;
+      border-radius:25px
+    }
+    .readyin-btn{
+      padding:6px 12px;
+      border-radius:25px;
+      background:#333;
+      color:#fff;
+      font-weight:700
+    }
+
+    #clock {
+      font-size:20px;
+      font-weight:600;
+      opacity:.9;
+    }
+
+    /* ===== Annotation Layer ===== */
+    #annotateCanvas{
+      position:fixed;
+      top:0; left:0;
+      width:100vw; height:100vh;
+      touch-action:none;
+      background:transparent;
+      z-index:999999;
+    }
+    .noclick { pointer-events:none !important; }
+
+    /* Toolbar container */
+    #annotateTools {
+      position:fixed;
+      top:10px;
+      right:180px;
+      z-index:1000000;
+      pointer-events:none;
+    }
+    #annotateToolsInner {
+      transform: rotate(-90deg);
+      transform-origin: top right;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      pointer-events:auto;
+    }
+
+    .tool-btn{
+      background:rgba(255,255,255,0.35);
+      border-radius:24px;
+      padding:8px 16px;
+      font-weight:700;
+      border:1px solid rgba(255,255,255,0.4);
+      font-size:14px;
+      color:black;
+      cursor:pointer;
+      backdrop-filter: blur(4px);
+    }
   </style>
 </head>
 <body>
-  <div class="rotate-90-ccw">
-    <header>
-      <h1>Technician Dashboard</h1>
-      <div id="clock" style="opacity:.9;font-size:13px">Loading...</div>
-    </header>
 
-    <main style="padding:16px">
-      <div class="legend">
-        <span class="asset-pill asset-video">Video</span>
-        <span class="asset-pill asset-sound">Sound</span>
-        <span class="asset-pill asset-lighting">Lighting</span>
-        <span class="asset-pill asset-grip">Grip</span>
-        <span class="asset-pill asset-uncategorised">Uncategorised</span>
-      </div>
-      <div id="tableWrap"></div>
-    </main>
+<!-- ===== Annotation Canvas ===== -->
+<canvas id="annotateCanvas"></canvas>
+
+<!-- ===== Toolbar ===== -->
+<div id="annotateTools">
+  <div id="annotateToolsInner">
+    <button class="tool-btn" onclick="toggleAnnotate()" id="toggleDrawBtn">DRAW OFF</button>
+    <button class="tool-btn" onclick="undoStroke()">Undo</button>
+    <button class="tool-btn" onclick="clearCanvas()">Clear</button>
+    <button class="tool-btn" onclick="enableEraser()">Eraser</button>
   </div>
+</div>
 
-  <script>
-    let bookings = [];
-    const tableWrap = document.getElementById('tableWrap');
-    const clockEl = document.getElementById('clock');
+<script>
+// ==============================
+// Annotation Logic
+// ==============================
 
-    function updateClock(){
-      clockEl.textContent=new Date().toLocaleString();
+const canvas = document.getElementById("annotateCanvas");
+const ctx = canvas.getContext("2d");
+
+let drawing = false;
+let erasing = false;
+let drawingEnabled = false;
+
+const strokeColor = "white";
+const strokeWidth = 5;
+
+const undoStack = [];
+
+function resizeCanvas(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+function saveState() {
+  undoStack.push(canvas.toDataURL());
+  if (undoStack.length > 40) undoStack.shift();
+}
+
+function undoStroke() {
+  if (!undoStack.length) return;
+  const img = new Image();
+  img.src = undoStack.pop();
+  img.onload = () => {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,0,0);
+  };
+}
+
+function enableEraser(){
+  erasing = true;
+  ctx.globalCompositeOperation = "destination-out";
+}
+
+function clearCanvas(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  undoStack.length = 0;
+}
+
+function toggleAnnotate(){
+  drawingEnabled = !drawingEnabled;
+
+  if (drawingEnabled){
+    canvas.classList.remove("noclick");
+    toggleDrawBtn.textContent = "DRAW ON";
+    toggleDrawBtn.style.background = "#5cff89";
+  } else {
+    canvas.classList.add("noclick");
+    toggleDrawBtn.textContent = "DRAW OFF";
+    toggleDrawBtn.style.background = "rgba(255,255,255,0.35)";
+  }
+}
+
+canvas.classList.add("noclick");
+
+canvas.addEventListener("pointerdown", e => {
+  if (!drawingEnabled) return;
+
+  saveState();
+  drawing = true;
+
+  ctx.beginPath();
+  ctx.moveTo(e.clientX, e.clientY);
+
+  ctx.globalCompositeOperation = erasing ? "destination-out" : "source-over";
+});
+
+canvas.addEventListener("pointermove", e => {
+  if (!drawingEnabled || !drawing) return;
+
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = erasing ? 24 : strokeWidth;
+  ctx.strokeStyle = strokeColor;
+
+  ctx.lineTo(e.clientX, e.clientY);
+  ctx.stroke();
+});
+
+canvas.addEventListener("pointerup", ()=>{
+  drawing = false;
+  erasing = false;
+});
+
+canvas.addEventListener("pointercancel", ()=>{
+  drawing = false;
+  erasing = false;
+});
+</script>
+
+
+
+<!-- =============================
+     TECH DASHBOARD SECTION
+============================= -->
+<div class="rotate-90-ccw">
+  <header>
+    <h1>Technician Dashboard</h1>
+
+    <div style="display:flex; gap:12px;">
+      <button id="btnToday" onclick="switchDay('today')" class="top-btn selected">Today</button>
+      <button id="btnTomorrow" onclick="switchDay('tomorrow')" class="top-btn">Tomorrow</button>
+    </div>
+
+    <div id="clock">Loading...</div>
+  </header>
+
+  <main style="padding:16px">
+    <div class="legend">
+      <span class="asset-pill asset-video">Video</span>
+      <span class="asset-pill asset-sound">Sound</span>
+      <span class="asset-pill asset-lighting">Lighting</span>
+      <span class="asset-pill asset-grip">Grip</span>
+      <span class="asset-pill asset-uncategorised">Uncategorised</span>
+    </div>
+    <div id="tableWrap"></div>
+  </main>
+</div>
+
+<script>
+// ==============================
+// Dashboard Logic
+// ==============================
+
+let bookings = [];
+let dayMode = "today";
+
+// ⭐ FIXED: These WERE missing — breaking tab switching
+const btnToday = document.getElementById("btnToday");
+const btnTomorrow = document.getElementById("btnTomorrow");
+
+const tableWrap = document.getElementById("tableWrap");
+const clockEl = document.getElementById("clock");
+
+function updateClock(){
+  clockEl.textContent = new Date().toLocaleString("en-GB", { timeZone:"Europe/London" });
+}
+setInterval(updateClock,1000);
+updateClock();
+
+function switchDay(mode){
+  dayMode = mode;
+
+  btnToday.classList.toggle("selected", mode==="today");
+  btnTomorrow.classList.toggle("selected", mode==="tomorrow");
+
+  fetchBookings();
+}
+
+function statusClass(status){
+  status = status.toLowerCase();
+  if (status.includes("ready")) return "ready";
+  if (status.includes("prepar")) return "preparing";
+  if (status.includes("not")) return "notpicked";
+  return "";
+}
+
+function formatTime(dt){
+  const d = new Date(dt);
+  return isNaN(d) ? "" : d.toLocaleTimeString("en-GB", {hour:'2-digit',minute:'2-digit'});
+}
+
+function renderAssets(arr){
+  return arr.map(a =>
+    `<span class="asset-pill asset-${a.category}">${a.name}</span>`
+  ).join("");
+}
+
+async function updateStatus(key,status){
+  await fetch("/api/update-status", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({ key, status })
+  });
+  fetchBookings();
+}
+
+async function setReadyIn(key, minutes){
+  await fetch("/api/ready-in", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({ key, minutes })
+  });
+  fetchBookings();
+}
+
+function renderTable(list){
+  let html = `
+  <table>
+    <thead>
+      <tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+  `;
+
+  if (!list.length){
+    html += `<tr><td colspan="5">No bookings.</td></tr>`;
+  } else {
+    for (const b of list){
+      html += `
+      <tr>
+        <td>${formatTime(b.startdatetime)}</td>
+        <td>${b.username}</td>
+        <td><span class="status ${statusClass(b.status)}">${b.status}</span></td>
+        <td>${renderAssets(b.assets)}</td>
+        <td>
+          ${b.status==="Not Picked"
+            ? `<button class="btn-preparing" onclick="updateStatus('${b._groupKey}','preparing')">Preparing</button>` : ""}
+          ${b.status==="Preparing"
+            ? `<button class="btn-ready" onclick="updateStatus('${b._groupKey}','ready')">Ready</button>` : ""}
+          <button class="btn-clear" onclick="updateStatus('${b._groupKey}','clear')">Clear</button>
+
+          <div class="readyin-wrap">
+            <span class="readyin-chip">Ready in <b>${b.readyInMinutes}</b> min</span>
+            <button class="readyin-btn" onclick="setReadyIn('${b._groupKey}', Math.max(0,${b.readyInMinutes}-5))">–5</button>
+            <button class="readyin-btn" onclick="setReadyIn('${b._groupKey}', ${b.readyInMinutes}+5)">+5</button>
+          </div>
+        </td>
+      </tr>`;
     }
-    setInterval(updateClock,1000);
-    updateClock();
+  }
 
-    function statusClass(status){
-      const t=(status||'').toLowerCase();
-      if (t.includes('ready')) return 'ready';
-      if (t.includes('prepar')) return 'preparing';
-      if (t.includes('not')) return 'notpicked';
-      return t.replace(/\s+/g,'');
-    }
+  html += "</tbody></table>";
+  tableWrap.innerHTML = html;
+}
 
-    function formatTime(dt){
-      if(!dt) return '';
-      const d=new Date(dt);
-      return isNaN(d) ? dt : d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-    }
+async function fetchBookings(){
+  const r = await fetch(`/api/bookings-tech?day=${dayMode}`);
+  const data = await r.json();
+  let list = data.bookings || [];
 
-    function renderAssets(assets){
-      return (assets||[]).map(a=>{
-        const name = typeof a==='string' ? a : (a.name||'');
-        const cat  = (typeof a==='object' && a.category) ? a.category : 'uncategorised';
-        const valid = ['video','sound','lighting','grip','uncategorised'];
-        const cls  = valid.includes((cat||'').toLowerCase()) ? cat.toLowerCase() : 'uncategorised';
-        return `<span class="asset-pill asset-${cls}" title="${cls}">${name}</span>`;
-      }).join('');
-    }
+  // Hide TRUE collected bookings (all items collected)
+  list = list.filter(b =>
+    !(b.statuses && b.statuses.length > 0 && b.statuses.every(st => st.includes("collected")))
+  );
 
-    async function updateStatus(key,status){
-      try{
-        await fetch('/api/update-status',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({key,status})
-        });
-        await fetchBookings();
-      }catch(e){
-        console.error('Update failed',e);
-      }
-    }
+  // Sort earliest to latest
+  list.sort((a,b)=> new Date(a.startdatetime) - new Date(b.startdatetime));
 
-    async function setReadyIn(key, minutes){
-      try{
-        await fetch('/api/ready-in',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({key,minutes})
-        });
-        await fetchBookings();
-      }catch(e){
-        console.error('Ready-in update failed',e);
-      }
-    }
+  bookings = list;
+  renderTable(bookings);
+}
 
-    function renderTable(list){
-      let html='<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th><th>Actions</th></tr></thead><tbody>';
-      if(!list.length){
-        html+='<tr><td colspan="5">No bookings for today.</td></tr>';
-      }else{
-        for(const b of list){
-          const time = formatTime(b.startdatetime);
-          const cls  = statusClass(b.status);
-          const showReadyInControls = b.status !== 'Ready for Collection';
-          const readyIn = Number(b.readyInMinutes||0);
+// Refresh every 5s
+setInterval(fetchBookings,5000);
+fetchBookings();
+</script>
 
-          html+=`<tr>
-            <td>${time}</td>
-            <td>${b.username}</td>
-            <td><span class="status ${cls}">${b.status}</span></td>
-            <td>${renderAssets(b.assets)}</td>
-            <td>
-              ${b.status==='Not Picked'
-                ? `<button class="btn-preparing" onclick="updateStatus('${b._groupKey}','preparing')">Preparing</button>`
-                : ''
-              }
-              ${b.status==='Preparing'
-                ? `<button class="btn-ready" onclick="updateStatus('${b._groupKey}','ready')">Ready</button>`
-                : ''
-              }
-              <button class="btn-clear" onclick="updateStatus('${b._groupKey}','clear')">Clear</button>
-
-              ${showReadyInControls ? `
-                <div class="readyin-wrap">
-                  <span class="readyin-chip">Ready in <b>${readyIn}</b> min</span>
-                  <button class="readyin-btn" onclick="(function(){const v=Math.max(0,${readyIn}-5); setReadyIn('${b._groupKey}',v)})()">–5</button>
-                  <button class="readyin-btn" onclick="setReadyIn('${b._groupKey}', ${readyIn}+5)">+5</button>
-                </div>` : ''
-              }
-            </td>
-          </tr>`;
-        }
-      }
-      html+='</tbody></table>';
-      tableWrap.innerHTML=html;
-    }
-
-    async function fetchBookings(){
-      try{
-        const resp = await fetch('/api/bookings');
-        const data = await resp.json();
-        bookings = (data.success && Array.isArray(data.bookings)) ? data.bookings : [];
-        bookings.sort((a,b)=>new Date(a.startdatetime)-new Date(b.startdatetime));
-        renderTable(bookings);
-      }catch(e){
-        console.error('Fetch failed',e);
-      }
-    }
-
-    setInterval(fetchBookings,5000);
-    (async function(){
-      await fetchBookings();
-    })();
-  </script>
 </body>
 </html>

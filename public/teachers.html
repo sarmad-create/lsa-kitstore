@@ -1,0 +1,357 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Teachers & Departments Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{
+      font-family:system-ui,Segoe UI,Roboto,Arial;
+      margin:0;
+      background:#0b1320;
+      color:#e6eef8;
+      font-size:16px;
+    }
+
+    header{
+      padding:16px;
+      background:#071126;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      font-size:18px;
+    }
+
+    h1{margin:0;font-size:22px}
+    #clock{font-size:16px;opacity:.9}
+
+    .tabs{
+      display:flex;
+      border-bottom:2px solid rgba(255,255,255,0.2);
+    }
+    .tab{
+      padding:12px 20px;
+      cursor:pointer;
+      font-weight:700;
+      opacity:.75;
+      font-size:18px;
+    }
+    .tab.active{
+      opacity:1;
+      border-bottom:3px solid #4ea1ff;
+    }
+
+    .section{
+      display:none;
+      padding:16px;
+      position:relative;
+    }
+    .section.active{display:block}
+
+    /* SEARCH BAR – More visible pill */
+#teacherSearch{
+  position:absolute;
+  top:0;
+  right:40px;
+  transform:translateY(-50%);
+  padding:10px 16px;
+  width:170px;
+  font-size:15px;
+  border-radius:25px;
+
+  background:#1e2d4a;          /* NEW: lighter, more visible */
+  border:2px solid #4ea1ff;    /* NEW: bright accent border */
+  color:white;
+  outline:none;
+  transition:0.25s;
+  box-shadow:0 0 10px rgba(78,161,255,0.25); /* slight glow */
+}
+
+#teacherSearch:focus{
+  width:220px;
+  background:#264067;          /* brighter on focus */
+  box-shadow:0 0 14px rgba(78,161,255,0.45); /* stronger glow */
+}
+
+#teacherSearch::placeholder{
+  color:#c8d6f2;               /* brighter placeholder */
+  opacity:0.9;
+  font-size:14px;
+}
+
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:10px;
+      font-size:16px;
+    }
+    th,td{
+      padding:12px;
+      text-align:left;
+      vertical-align:top;
+    }
+    tr:not(:first-child){
+      border-top:1px solid rgba(255,255,255,0.1);
+    }
+
+    .teacher-name{
+      width:180px;
+      font-size:18px;
+      font-weight:600;
+      white-space:nowrap;
+    }
+
+    .dept-heading{
+      font-size:22px;
+      font-weight:700;
+      margin-top:22px;
+      padding-bottom:6px;
+      border-bottom:2px solid rgba(255,255,255,0.25);
+    }
+
+    .dept-summary{
+      font-size:16px;
+      opacity:.85;
+      margin-top:4px;
+      margin-bottom:10px;
+    }
+
+    .dept-title{
+      font-size:20px;
+      font-weight:700;
+      margin-top:16px;
+      margin-bottom:6px;
+    }
+
+    /* Asset pills */
+    .asset-pill{
+      display:inline-block;
+      border-radius:8px;
+      padding:6px 10px;
+      margin:4px 4px 4px 0;
+      font-size:14px;
+      font-weight:600;
+    }
+    .asset-video{background:rgba(128,0,128,0.25);color:#efe8ff}
+    .asset-sound{background:rgba(200,50,50,0.25);color:#ffecec}
+    .asset-lighting{background:rgba(255,235,59,0.45);color:#fff}
+    .asset-grip{background:rgba(0,123,255,0.28);color:#eaf2ff}
+    .asset-uncategorised{background:rgba(200,200,200,0.18);color:#e6eef8}
+
+    .no-results{font-size:14px;opacity:.7;margin:6px 0}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Teachers & Departments Dashboard</h1>
+  <div id="clock">Loading...</div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-target="teachers">Teachers</div>
+  <div class="tab" data-target="departments">Departments</div>
+</div>
+
+<main>
+
+  <!-- TEACHERS PAGE -->
+  <div id="teachers" class="section active">
+    <input id="teacherSearch" placeholder="Search…" oninput="filterTeachers()">
+    <h2 style="font-size:20px;margin-top:20px;">Teachers</h2>
+    <div id="teacherTable"></div>
+  </div>
+
+  <!-- DEPARTMENTS PAGE -->
+  <div id="departments" class="section">
+    <h2 style="font-size:20px;">Departments</h2>
+    <div id="departmentWrap"></div>
+  </div>
+
+</main>
+
+<script>
+
+  /* CLOCK */
+  setInterval(()=>clock.textContent=new Date().toLocaleString(),1000);
+
+  /* TABS */
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.addEventListener('click',()=>{
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.target).classList.add('active');
+    });
+  });
+
+  /* DEPARTMENTS */
+  const departmentMap = {
+    "Technical":[
+      "Brandon Dickerson","Julian MacDonnell","Asya Ali-Mehmet",
+      "Elif Sengul","Joe Reardon","Max Jung","Thomas Mallen"
+    ],
+    "Post Production":[
+      "Adam Thomas","Oliver Turner","Lynda Boudjeltia",
+      "Scott Bromley","Paul Cousins"
+    ],
+    "Production Development":[
+      "Claire Wiener","Jack Avery","Poppy Coggins",
+      "Finn Conduct","Kiz Hoque"
+    ],
+    "Level 4":[
+      "Iris Helfer","Michael Jobling","Anthony Thomas",
+      "Begum Whitehead","Lena Nix"
+    ]
+  };
+
+  const allowedTeachers = Object.values(departmentMap).flat();
+
+  const CATEGORY_ORDER={
+    video:1,lighting:2,sound:3,grip:4,uncategorised:5
+  };
+
+  function processAssets(list){
+    const map={};
+    list.forEach(a=>{
+      if(!map[a.name]) map[a.name]={...a,count:0};
+      map[a.name].count++;
+    });
+    return Object.values(map).sort((a,b)=>{
+      const A=CATEGORY_ORDER[(a.category||"uncategorised").toLowerCase()]||999;
+      const B=CATEGORY_ORDER[(b.category||"uncategorised").toLowerCase()]||999;
+      return A===B ? a.name.localeCompare(b.name) : A-B;
+    });
+  }
+
+  function assetPill(a){
+    const qty=a.count>1?` ×${a.count}`:"";
+    const c=(a.category||"uncategorised").toLowerCase();
+    return `<span class="asset-pill asset-${c}">${a.name}${qty}</span>`;
+  }
+
+  let allTeacherHTML="";
+
+  /* LOAD DATA */
+  async function load(){
+    const resp = await fetch('/api/bookings-all');
+    const data = await resp.json();
+    const bookings = data.bookings || [];
+
+    const relevant = bookings.filter(b=>allowedTeachers.includes(b.username));
+
+    const byTeacher={};
+    allowedTeachers.forEach(t=>byTeacher[t]=[]);
+    relevant.forEach(b=>b.assets.forEach(a=>byTeacher[b.username].push(a)));
+
+    /* TEACHERS PAGE BUILD */
+    let html="";
+    Object.keys(departmentMap).forEach(dept=>{
+      const teachers=departmentMap[dept].slice().sort((a,b)=>a.localeCompare(b));
+      const deptItems=[];
+      teachers.forEach(t=>deptItems.push(...byTeacher[t]));
+
+      html+=`
+        <div class="dept-block">
+          <div class="dept-heading">${dept}</div>
+          <div class="dept-summary">${teachers.length} teachers — ${deptItems.length} total items</div>
+          <table>
+            <thead><tr><th>Teacher</th><th>Equipment</th></tr></thead>
+            <tbody>
+      `;
+
+      teachers.forEach(name=>{
+        const assets=processAssets(byTeacher[name]);
+        const pillHTML=assets.length?assets.map(assetPill).join(""):"<i>No equipment</i>";
+        html+=`
+          <tr data-teacher="${name.toLowerCase()}">
+            <td class="teacher-name">${name}</td>
+            <td>${pillHTML}</td>
+          </tr>
+        `;
+      });
+
+      html+=`
+            </tbody>
+          </table>
+        </div>
+      `;
+    });
+
+    allTeacherHTML=html;
+    document.getElementById("teacherTable").innerHTML=html;
+
+    if(document.getElementById("teacherSearch").value.trim()!==""){
+      filterTeachers();
+    }
+
+    /* DEPARTMENTS PAGE BUILD */
+    const deptHTML = buildDepartments(byTeacher);
+    document.getElementById("departmentWrap").innerHTML = deptHTML;
+  }
+
+  /* BUILD DEPARTMENTS PAGE */
+  function buildDepartments(byTeacher){
+    let html="";
+
+    Object.keys(departmentMap).forEach(dept=>{
+      const items=[];
+      departmentMap[dept].forEach(t=>items.push(...byTeacher[t]));
+
+      const processed = processItems(items);
+
+      html += `
+        <div class="dept-title">${dept}</div>
+        ${processed.length ? processed.map(assetPill).join("") : "<i>No equipment checked out</i>"}
+      `;
+    });
+
+    return html;
+  }
+
+  function processItems(list){
+    return processAssets(list);
+  }
+
+  /* FILTER TEACHERS + HIDE EMPTY DEPTS */
+  function filterTeachers(){
+    const q = teacherSearch.value.trim().toLowerCase();
+    const container=document.getElementById("teacherTable");
+
+    if(q===""){
+      container.innerHTML=allTeacherHTML;
+      return;
+    }
+
+    const temp=document.createElement("div");
+    temp.innerHTML=allTeacherHTML;
+
+    temp.querySelectorAll(".dept-block").forEach(block=>{
+      const rows=block.querySelectorAll("tbody tr");
+      let matches=0;
+
+      rows.forEach(row=>{
+        if(row.dataset.teacher.includes(q)){
+          row.style.display="";
+          matches++;
+        } else {
+          row.style.display="none";
+        }
+      });
+
+      if(matches===0){
+        block.style.display="none";
+      }
+    });
+
+    container.innerHTML=temp.innerHTML;
+  }
+
+  load();
+  setInterval(load,5000);
+</script>
+
+</body>
+</html>
