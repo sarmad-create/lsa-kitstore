@@ -10,7 +10,7 @@
       margin:0;
       background:#0b1320;
       color:#e6eef8;
-      font-size:16px;
+      font-size:14px;
     }
 
     header{
@@ -19,12 +19,11 @@
       display:flex;
       justify-content:space-between;
       align-items:center;
-      font-size:18px;
     }
+    h1{margin:0;font-size:20px}
+    #clock{font-size:14px;opacity:.9}
 
-    h1{margin:0;font-size:22px}
-    #clock{font-size:16px;opacity:.9}
-
+    /* Tabs */
     .tabs{
       display:flex;
       border-bottom:2px solid rgba(255,255,255,0.2);
@@ -34,7 +33,7 @@
       cursor:pointer;
       font-weight:700;
       opacity:.75;
-      font-size:18px;
+      font-size:16px;
     }
     .tab.active{
       opacity:1;
@@ -48,46 +47,43 @@
     }
     .section.active{display:block}
 
-    /* SEARCH BAR – More visible pill */
-#teacherSearch{
-  position:absolute;
-  top:0;
-  right:40px;
-  transform:translateY(-50%);
-  padding:10px 16px;
-  width:170px;
-  font-size:15px;
-  border-radius:25px;
+    /* Search Bar */
+    #teacherSearch{
+      position:absolute;
+      top:0;
+      right:40px;
+      transform:translateY(-50%);
+      padding:8px 14px;
+      width:150px;
+      font-size:13px;
+      border-radius:20px;
+      background:#1e2d4a;
+      border:2px solid #4ea1ff;
+      color:white;
+      outline:none;
+      transition:0.25s;
+      box-shadow:0 0 10px rgba(78,161,255,0.25);
+    }
+    #teacherSearch:focus{
+      width:200px;
+      background:#264067;
+      box-shadow:0 0 14px rgba(78,161,255,0.45);
+    }
+    #teacherSearch::placeholder{
+      color:#c8d6f2;
+      opacity:0.9;
+      font-size:13px;
+    }
 
-  background:#1e2d4a;          /* NEW: lighter, more visible */
-  border:2px solid #4ea1ff;    /* NEW: bright accent border */
-  color:white;
-  outline:none;
-  transition:0.25s;
-  box-shadow:0 0 10px rgba(78,161,255,0.25); /* slight glow */
-}
-
-#teacherSearch:focus{
-  width:220px;
-  background:#264067;          /* brighter on focus */
-  box-shadow:0 0 14px rgba(78,161,255,0.45); /* stronger glow */
-}
-
-#teacherSearch::placeholder{
-  color:#c8d6f2;               /* brighter placeholder */
-  opacity:0.9;
-  font-size:14px;
-}
-
-
+    /* Tables */
     table{
       width:100%;
       border-collapse:collapse;
       margin-top:10px;
-      font-size:16px;
+      font-size:14px;
     }
     th,td{
-      padding:12px;
+      padding:10px;
       text-align:left;
       vertical-align:top;
     }
@@ -96,41 +92,52 @@
     }
 
     .teacher-name{
-      width:180px;
-      font-size:18px;
+      width:160px;
+      font-size:15px;
       font-weight:600;
       white-space:nowrap;
     }
 
-    .dept-heading{
-      font-size:22px;
+    /* Collapsible department headers */
+    .dept-block{
+      margin-top:20px;
+      border-bottom:1px solid rgba(255,255,255,0.1);
+      padding-bottom:10px;
+    }
+
+    .dept-header{
+      cursor:pointer;
+      font-size:18px;
       font-weight:700;
-      margin-top:22px;
-      padding-bottom:6px;
-      border-bottom:2px solid rgba(255,255,255,0.25);
+      display:flex;
+      align-items:center;
+      gap:8px;
+      user-select:none;
+      margin-bottom:6px;
+    }
+
+    .chevron{
+      font-size:18px;
+      transition:0.2s;
     }
 
     .dept-summary{
-      font-size:16px;
-      opacity:.85;
-      margin-top:4px;
-      margin-bottom:10px;
+      font-size:13px;
+      opacity:.7;
+      margin-bottom:6px;
     }
 
-    .dept-title{
-      font-size:20px;
-      font-weight:700;
-      margin-top:16px;
-      margin-bottom:6px;
+    .dept-content{
+      display:none;
     }
 
     /* Asset pills */
     .asset-pill{
       display:inline-block;
-      border-radius:8px;
-      padding:6px 10px;
-      margin:4px 4px 4px 0;
-      font-size:14px;
+      border-radius:6px;
+      padding:4px 8px;
+      margin:3px 4px 0 0;
+      font-size:13px;
       font-weight:600;
     }
     .asset-video{background:rgba(128,0,128,0.25);color:#efe8ff}
@@ -139,7 +146,30 @@
     .asset-grip{background:rgba(0,123,255,0.28);color:#eaf2ff}
     .asset-uncategorised{background:rgba(200,200,200,0.18);color:#e6eef8}
 
-    .no-results{font-size:14px;opacity:.7;margin:6px 0}
+    /* Show All button */
+    .show-all-btn{
+      margin-top:4px;
+      padding:4px 10px;
+      border-radius:12px;
+      background:#4ea1ff;
+      color:#071126;
+      font-size:12px;
+      border:none;
+      cursor:pointer;
+      font-weight:700;
+      align-self:flex-end;
+      margin-left:auto;
+    }
+
+    /* Left-aligned stacked groups */
+    .cat-stack{
+      display:flex;
+      flex-direction:column;
+      align-items:flex-start;
+      width:100%;
+      gap:4px;
+      padding-left:2px;
+    }
   </style>
 </head>
 <body>
@@ -156,201 +186,275 @@
 
 <main>
 
-  <!-- TEACHERS PAGE -->
+  <!-- TEACHERS TAB -->
   <div id="teachers" class="section active">
     <input id="teacherSearch" placeholder="Search…" oninput="filterTeachers()">
-    <h2 style="font-size:20px;margin-top:20px;">Teachers</h2>
+    <h2 style="font-size:18px;margin-top:20px;">Teachers</h2>
     <div id="teacherTable"></div>
   </div>
 
-  <!-- DEPARTMENTS PAGE -->
+  <!-- DEPARTMENTS TAB -->
   <div id="departments" class="section">
-    <h2 style="font-size:20px;">Departments</h2>
+    <h2 style="font-size:18px;">Departments</h2>
     <div id="departmentWrap"></div>
   </div>
 
 </main>
 
 <script>
+/* Clock */
+setInterval(()=>clock.textContent=new Date().toLocaleString(),1000);
 
-  /* CLOCK */
-  setInterval(()=>clock.textContent=new Date().toLocaleString(),1000);
-
-  /* TABS */
-  document.querySelectorAll('.tab').forEach(tab=>{
-    tab.addEventListener('click',()=>{
-      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-      document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
-
-      tab.classList.add('active');
-      document.getElementById(tab.dataset.target).classList.add('active');
-    });
+/* Tabs */
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.target).classList.add('active');
   });
+});
 
-  /* DEPARTMENTS */
-  const departmentMap = {
-    "Technical":[
-      "Brandon Dickerson","Julian MacDonnell","Asya Ali-Mehmet",
-      "Elif Sengul","Joe Reardon","Max Jung","Thomas Mallen"
-    ],
-    "Post Production":[
-      "Adam Thomas","Oliver Turner","Lynda Boudjeltia",
-      "Scott Bromley","Paul Cousins"
-    ],
-    "Production Development":[
-      "Claire Wiener","Jack Avery","Poppy Coggins",
-      "Finn Conduct","Kiz Hoque"
-    ],
-    "Level 4":[
-      "Iris Helfer","Michael Jobling","Anthony Thomas",
-      "Begum Whitehead","Lena Nix"
-    ]
-  };
+/* Department → Teacher mapping */
+const departmentMap = {
+  "Technical":[
+    "Brandon Dickerson","Julian MacDonnell","Asya Ali-Mehmet",
+    "Elif Sengul","Joe Reardon","Max Jung","Thomas Mallen"
+  ],
+  "Post Production":[
+    "Adam Thomas","Oliver Turner","Lynda Boudjeltia",
+    "Scott Bromley","Paul Cousins"
+  ],
+  "Production Development":[
+    "Claire Wiener","Jack Avery","Poppy Coggins",
+    "Finn Conduct","Kiz Hoque"
+  ],
+  "Level 4":[
+    "Iris Helfer","Michael Jobling","Anthony Thomas",
+    "Begum Whitehead","Lena Nix"
+  ]
+};
 
-  const allowedTeachers = Object.values(departmentMap).flat();
+const allowedTeachers = Object.values(departmentMap).flat();
 
-  const CATEGORY_ORDER={
-    video:1,lighting:2,sound:3,grip:4,uncategorised:5
-  };
+/* Category sort order */
+const CATEGORY_ORDER={video:1,lighting:2,sound:3,grip:4,uncategorised:5};
 
-  function processAssets(list){
-    const map={};
-    list.forEach(a=>{
-      if(!map[a.name]) map[a.name]={...a,count:0};
-      map[a.name].count++;
-    });
-    return Object.values(map).sort((a,b)=>{
-      const A=CATEGORY_ORDER[(a.category||"uncategorised").toLowerCase()]||999;
-      const B=CATEGORY_ORDER[(b.category||"uncategorised").toLowerCase()]||999;
-      return A===B ? a.name.localeCompare(b.name) : A-B;
-    });
-  }
+/* Merge + sort assets by category & name */
+function processAssets(list){
+  const map={};
+  list.forEach(a=>{
+    if(!map[a.name]) map[a.name]={...a,count:0};
+    map[a.name].count++;
+  });
+  return Object.values(map).sort((a,b)=>{
+    const A=CATEGORY_ORDER[a.category]||999;
+    const B=CATEGORY_ORDER[b.category]||999;
+    return A===B ? a.name.localeCompare(b.name) : A-B;
+  });
+}
 
-  function assetPill(a){
-    const qty=a.count>1?` ×${a.count}`:"";
-    const c=(a.category||"uncategorised").toLowerCase();
-    return `<span class="asset-pill asset-${c}">${a.name}${qty}</span>`;
-  }
+/* Pill renderer – uses real category from API/lists.json */
+function assetPill(a){
+  const qty=a.count>1?` ×${a.count}`:"";
+  const cat=(a.category||"uncategorised").toLowerCase();
+  return `<span class="asset-pill asset-${cat}">${a.name}${qty}</span>`;
+}
 
-  let allTeacherHTML="";
+let allTeacherHTML="";
+let deptOpenState={};
 
-  /* LOAD DATA */
-  async function load(){
-    const resp = await fetch('/api/bookings-all');
-    const data = await resp.json();
-    const bookings = data.bookings || [];
+/* Department category criteria */
+const CAMERA_LIST = [
+  "Sony FX9","Sony FX30","Sony A7IV","Sony A7Sii","Sony A7IV + Cage",
+  "Sony ZV-E 10 II","Sony A6000"
+];
 
-    const relevant = bookings.filter(b=>allowedTeachers.includes(b.username));
+const SOUND_LIST = [
+  "Zoom F6","Zoom H5","Sony Radio Mic Kit",
+  "Sony Radio Boom Mic Receiver + Transmiter"
+];
 
-    const byTeacher={};
-    allowedTeachers.forEach(t=>byTeacher[t]=[]);
-    relevant.forEach(b=>b.assets.forEach(a=>byTeacher[b.username].push(a)));
+const GRIP_LIST = [
+  "Sachtler Tripods","SmallRig shoulder Rig","SmallRig Tripod",
+  "Libec Tripod","DJI RS 4","DJI RS4 PRO COMBO",
+  "DJI RS 3","DJI Ronin S","Easyrig"
+];
 
-    /* TEACHERS PAGE BUILD */
-    let html="";
-    Object.keys(departmentMap).forEach(dept=>{
-      const teachers=departmentMap[dept].slice().sort((a,b)=>a.localeCompare(b));
-      const deptItems=[];
-      teachers.forEach(t=>deptItems.push(...byTeacher[t]));
+/* LOAD DATA */
+async function load(){
+  const resp = await fetch('/api/bookings-all');
+  const data = await resp.json();
+  const bookings = data.bookings || [];
 
-      html+=`
-        <div class="dept-block">
-          <div class="dept-heading">${dept}</div>
-          <div class="dept-summary">${teachers.length} teachers — ${deptItems.length} total items</div>
+  const relevant = bookings.filter(b=>allowedTeachers.includes(b.username));
+
+  const byTeacher={};
+  allowedTeachers.forEach(t=>byTeacher[t]=[]);
+  relevant.forEach(b=>b.assets.forEach(a=>byTeacher[b.username].push(a)));
+
+  /* ---------------- TEACHERS TAB ---------------- */
+  let html="";
+  Object.keys(departmentMap).forEach(dept=>{
+    const teachers=departmentMap[dept].slice().sort((a,b)=>a.localeCompare(b));
+    const deptItems=[];
+    teachers.forEach(t=>deptItems.push(...byTeacher[t]));
+
+    const open = deptOpenState[dept] ?? false;
+
+    html+=`
+      <div class="dept-block">
+        <div class="dept-header" onclick="toggleDept('${dept}')">
+          <span class="chevron">${open ? "▾" : "▸"}</span> ${dept}
+        </div>
+
+        <div class="dept-summary">${teachers.length} teachers — ${deptItems.length} items</div>
+
+        <div class="dept-content" id="dept-${dept}" style="display:${open?"block":"none"};">
           <table>
             <thead><tr><th>Teacher</th><th>Equipment</th></tr></thead>
             <tbody>
-      `;
+    `;
 
-      teachers.forEach(name=>{
-        const assets=processAssets(byTeacher[name]);
-        const pillHTML=assets.length?assets.map(assetPill).join(""):"<i>No equipment</i>";
-        html+=`
-          <tr data-teacher="${name.toLowerCase()}">
-            <td class="teacher-name">${name}</td>
-            <td>${pillHTML}</td>
-          </tr>
-        `;
-      });
-
+    teachers.forEach(name=>{
+      const assets=processAssets(byTeacher[name]);
+      const pillHTML=assets.length ? assets.map(assetPill).join("") : "<i>No equipment</i>";
       html+=`
+        <tr data-teacher="${name.toLowerCase()}">
+          <td class="teacher-name">${name}</td>
+          <td>${pillHTML}</td>
+        </tr>
+      `;
+    });
+
+    html+=`
             </tbody>
           </table>
         </div>
-      `;
-    });
+      </div>
+    `;
+  });
 
-    allTeacherHTML=html;
-    document.getElementById("teacherTable").innerHTML=html;
+  allTeacherHTML=html;
+  teacherTable.innerHTML=html;
 
-    if(document.getElementById("teacherSearch").value.trim()!==""){
-      filterTeachers();
-    }
+  if(teacherSearch.value.trim()!==""){ filterTeachers(); }
 
-    /* DEPARTMENTS PAGE BUILD */
-    const deptHTML = buildDepartments(byTeacher);
-    document.getElementById("departmentWrap").innerHTML = deptHTML;
+  /* ---------------- DEPARTMENTS TAB ---------------- */
+  departmentWrap.innerHTML = buildDepartments(byTeacher);
+}
+
+/* Build Department Category View */
+function buildDepartments(byTeacher){
+  let html="";
+
+  Object.keys(departmentMap).forEach(dept=>{
+    const allItems=[];
+    departmentMap[dept].forEach(t=>allItems.push(...byTeacher[t]));
+    const processed = processAssets(allItems);
+
+    /* FILTER BY CATEGORY CRITERIA */
+    const cams = processed.filter(a => CAMERA_LIST.includes(a.name));
+    const snd  = processed.filter(a => SOUND_LIST.includes(a.name));
+    const grip = processed.filter(a => GRIP_LIST.includes(a.name));
+    const light = processed.filter(a => a.category==="lighting");
+
+    const show = deptOpenState[`show_${dept}`] ?? false;
+
+    html += `
+      <div class="dept-block">
+        <div class="dept-header">
+          ${dept}
+        </div>
+
+        <div class="cat-stack">
+          <div>${cams.map(assetPill).join("")}</div>
+          <div>${snd.map(assetPill).join("")}</div>
+          <div>${light.map(assetPill).join("")}</div>
+          <div>${grip.map(assetPill).join("")}</div>
+          <button class="show-all-btn" onclick="toggleShowAll('${dept}')">
+            ${show ? "Hide" : "Show All"}
+          </button>
+        </div>
+
+        <div id="dept-all-${dept}" style="display:${show?'block':'none'};margin-top:10px;">
+          ${processed.map(assetPill).join("")}
+        </div>
+      </div>
+    `;
+  });
+
+  return html;
+}
+
+/* Toggle Teachers Tab Expansion */
+function toggleDept(dept){
+  deptOpenState[dept] = !deptOpenState[dept];
+  load();
+}
+
+/* Toggle Show All for department view */
+function toggleShowAll(dept){
+  deptOpenState[`show_${dept}`] = !deptOpenState[`show_${dept}`];
+  load();
+}
+
+/* Teacher search */
+function filterTeachers(){
+  const q = teacherSearch.value.trim().toLowerCase();
+  const container=document.getElementById("teacherTable");
+
+  if(q===""){
+    container.innerHTML=allTeacherHTML;
+    restoreOpenStates();
+    return;
   }
 
-  /* BUILD DEPARTMENTS PAGE */
-  function buildDepartments(byTeacher){
-    let html="";
+  const temp=document.createElement("div");
+  temp.innerHTML=allTeacherHTML;
 
-    Object.keys(departmentMap).forEach(dept=>{
-      const items=[];
-      departmentMap[dept].forEach(t=>items.push(...byTeacher[t]));
+  temp.querySelectorAll(".dept-block").forEach(block=>{
+    const rows=block.querySelectorAll("tbody tr");
+    let matches=0;
 
-      const processed = processItems(items);
-
-      html += `
-        <div class="dept-title">${dept}</div>
-        ${processed.length ? processed.map(assetPill).join("") : "<i>No equipment checked out</i>"}
-      `;
-    });
-
-    return html;
-  }
-
-  function processItems(list){
-    return processAssets(list);
-  }
-
-  /* FILTER TEACHERS + HIDE EMPTY DEPTS */
-  function filterTeachers(){
-    const q = teacherSearch.value.trim().toLowerCase();
-    const container=document.getElementById("teacherTable");
-
-    if(q===""){
-      container.innerHTML=allTeacherHTML;
-      return;
-    }
-
-    const temp=document.createElement("div");
-    temp.innerHTML=allTeacherHTML;
-
-    temp.querySelectorAll(".dept-block").forEach(block=>{
-      const rows=block.querySelectorAll("tbody tr");
-      let matches=0;
-
-      rows.forEach(row=>{
-        if(row.dataset.teacher.includes(q)){
-          row.style.display="";
-          matches++;
-        } else {
-          row.style.display="none";
-        }
-      });
-
-      if(matches===0){
-        block.style.display="none";
+    rows.forEach(row=>{
+      if(row.dataset.teacher.includes(q)){
+        row.style.display="";
+        matches++;
+      } else {
+        row.style.display="none";
       }
     });
 
-    container.innerHTML=temp.innerHTML;
-  }
+    const content = block.querySelector(".dept-content");
+    const chevron = block.querySelector(".chevron");
 
-  load();
-  setInterval(load,5000);
+    if(matches===0){
+      block.style.display="none";
+    } else {
+      block.style.display="";
+      content.style.display="block";
+      if(chevron) chevron.textContent="▾";
+    }
+  });
+
+  container.innerHTML=temp.innerHTML;
+}
+
+function restoreOpenStates(){
+  Object.keys(deptOpenState).forEach(dept=>{
+    const open=deptOpenState[dept];
+    const el=document.getElementById(`dept-${dept}`);
+    if(el){
+      el.style.display=open?"block":"none";
+      const chev = el.parentElement.querySelector(".chevron");
+      if(chev) chev.textContent=open?"▾":"▸";
+    }
+  });
+}
+
+load();
+setInterval(load,5000);
 </script>
 
 </body>
