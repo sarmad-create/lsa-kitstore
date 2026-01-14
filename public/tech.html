@@ -12,9 +12,19 @@
       height:100%; width:100%;
     }
 
-    /* Rotate entire dashboard 90deg CCW */
+    /* Scroll wrapper */
+    #scrollWrap {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Rotated dashboard */
     .rotate-90-ccw {
-      position: fixed;
+      position: absolute; /* changed from fixed */
       top: 100%;
       left: 0;
       transform-origin: left top;
@@ -115,18 +125,20 @@
       opacity:.9;
     }
 
-    /* ===== Annotation Layer ===== */
+    /* Annotation layer */
     #annotateCanvas{
       position:fixed;
       top:0; left:0;
       width:100vw; height:100vh;
-      touch-action:none;
       background:transparent;
       z-index:999999;
+
+      /* IMPORTANT: this is overridden dynamically */
+      touch-action:none;
     }
+
     .noclick { pointer-events:none !important; }
 
-    /* Toolbar container */
     #annotateTools {
       position:fixed;
       top:10px;
@@ -158,10 +170,10 @@
 </head>
 <body>
 
-<!-- ===== Annotation Canvas ===== -->
+<!-- Annotation Canvas -->
 <canvas id="annotateCanvas"></canvas>
 
-<!-- ===== Toolbar ===== -->
+<!-- Toolbar -->
 <div id="annotateTools">
   <div id="annotateToolsInner">
     <button class="tool-btn" onclick="toggleAnnotate()" id="toggleDrawBtn">DRAW OFF</button>
@@ -172,12 +184,13 @@
 </div>
 
 <script>
-// ==============================
-// Annotation Logic
-// ==============================
+/* ===========================
+      Annotation Logic
+=========================== */
 
 const canvas = document.getElementById("annotateCanvas");
 const ctx = canvas.getContext("2d");
+const scrollWrap = document.getElementById("scrollWrap");
 
 let drawing = false;
 let erasing = false;
@@ -220,6 +233,9 @@ function clearCanvas(){
   undoStack.length = 0;
 }
 
+/* ===========================
+   CRITICAL FIX FOR SCROLLING
+=========================== */
 function toggleAnnotate(){
   drawingEnabled = !drawingEnabled;
 
@@ -227,12 +243,22 @@ function toggleAnnotate(){
     canvas.classList.remove("noclick");
     toggleDrawBtn.textContent = "DRAW ON";
     toggleDrawBtn.style.background = "#5cff89";
+
+    scrollWrap.style.overflow = "hidden";   // block scroll
+    canvas.style.touchAction = "none";      // allow drawing
+
   } else {
     canvas.classList.add("noclick");
     toggleDrawBtn.textContent = "DRAW OFF";
     toggleDrawBtn.style.background = "rgba(255,255,255,0.35)";
+
+    scrollWrap.style.overflowY = "auto";    // enable scroll
+    canvas.style.touchAction = "auto";      // pass touch events through
   }
 }
+/* ===========================
+   END FIX
+=========================== */
 
 canvas.classList.add("noclick");
 
@@ -272,10 +298,9 @@ canvas.addEventListener("pointercancel", ()=>{
 </script>
 
 
+<!-- Dashboard Section -->
+<div id="scrollWrap">
 
-<!-- =============================
-     TECH DASHBOARD SECTION
-============================= -->
 <div class="rotate-90-ccw">
   <header>
     <h1>Technician Dashboard</h1>
@@ -300,15 +325,13 @@ canvas.addEventListener("pointercancel", ()=>{
   </main>
 </div>
 
-<script>
-// ==============================
-// Dashboard Logic
-// ==============================
+</div>
 
+<script>
+/* Dashboard Logic (unchanged) */
 let bookings = [];
 let dayMode = "today";
 
-// ⭐ FIXED: These WERE missing — breaking tab switching
 const btnToday = document.getElementById("btnToday");
 const btnTomorrow = document.getElementById("btnTomorrow");
 
@@ -412,19 +435,16 @@ async function fetchBookings(){
   const data = await r.json();
   let list = data.bookings || [];
 
-  // Hide TRUE collected bookings (all items collected)
   list = list.filter(b =>
     !(b.statuses && b.statuses.length > 0 && b.statuses.every(st => st.includes("collected")))
   );
 
-  // Sort earliest to latest
   list.sort((a,b)=> new Date(a.startdatetime) - new Date(b.startdatetime));
 
   bookings = list;
   renderTable(bookings);
 }
 
-// Refresh every 5s
 setInterval(fetchBookings,5000);
 fetchBookings();
 </script>
