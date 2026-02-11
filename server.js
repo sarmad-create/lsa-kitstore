@@ -27,7 +27,7 @@ const STATUS_FILE = path.join(__dirname, 'statuses.json');
 const READYIN_FILE = path.join(__dirname, 'readyin.json');
 const LISTS_FILE = path.join(__dirname, 'lists.json');
 
-async function readJson(file, fallback={}) {
+async function readJson(file, fallback = {}) {
   try {
     const content = await fs.readFile(file, 'utf8');
     return JSON.parse(content || 'null') ?? fallback;
@@ -40,9 +40,9 @@ async function writeJson(file, obj) {
   await fs.writeFile(file, JSON.stringify(obj, null, 2));
 }
 
-async function readStatuses(){ return readJson(STATUS_FILE, {}); }
-async function readReadyIn(){ return readJson(READYIN_FILE, {}); }
-async function readLists(){ return readJson(LISTS_FILE, {video:[],sound:[],lighting:[],grip:[]}); }
+async function readStatuses() { return readJson(STATUS_FILE, {}); }
+async function readReadyIn() { return readJson(READYIN_FILE, {}); }
+async function readLists() { return readJson(LISTS_FILE, { video: [], sound: [], lighting: [], grip: [] }); }
 
 /* ===== JWT CACHE ===== */
 let cachedJwt = null, jwtExpiry = 0;
@@ -51,11 +51,11 @@ async function getJwt() {
   if (cachedJwt && Date.now() < jwtExpiry - 3000) return cachedJwt;
 
   const res = await axios.post(`${BASE_URL}/scripts/api/v1/jwt_request`, {}, {
-    headers:{
-      Accept:'application/json',
-      'Content-Type':'application/json',
-      AuthToken:AUTH_TOKEN,
-      AuthKey:AUTH_KEY
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      AuthToken: AUTH_TOKEN,
+      AuthKey: AUTH_KEY
     }
   });
 
@@ -88,12 +88,12 @@ function getTimeBucket(dt, minutes = 5) {
   return new Date(Math.floor(d.getTime() / (minutes * 60000)) * (minutes * 60000)).toISOString();
 }
 
-function makeGroupKey(user, start){ return `${user}_${start}`; }
+function makeGroupKey(user, start) { return `${user}_${start}`; }
 
-function norm(s){ return String(s||"").trim().toLowerCase(); }
-function inList(name, list){ return list.some(x => norm(x) === norm(name)); }
+function norm(s) { return String(s || "").trim().toLowerCase(); }
+function inList(name, list) { return list.some(x => norm(x) === norm(name)); }
 
-function categoryFromLists(name, lists){
+function categoryFromLists(name, lists) {
   if (inList(name, lists.video)) return "video";
   if (inList(name, lists.sound)) return "sound";
   if (inList(name, lists.lighting)) return "lighting";
@@ -102,21 +102,26 @@ function categoryFromLists(name, lists){
 }
 
 /* ============================================================
-   ROUTES — TEACHERS / TECH / STATIC
+   ROUTES — PAGES
 ============================================================ */
 
-app.get("/teachers", (req,res)=>{
+app.get("/teachers", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "teachers.html"));
+});
+
+/* ✅ CALENDAR ROUTES (fixes "Cannot GET /calendar") */
+app.get(["/calendar", "/calendar.html"], (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "calendar.html"));
 });
 
 /* TECH DASHBOARD SECRET PATH */
 const TECH_PATH = "/tech-94f02c77b8c149e8bb3b0f72d8f93fa2";
 
-app.get(['/tech','/tech.html','/public/tech.html'], (req,res) => {
+app.get(['/tech', '/tech.html', '/public/tech.html'], (req, res) => {
   res.redirect(302, TECH_PATH);
 });
 
-app.get(TECH_PATH, (req,res) => {
+app.get(TECH_PATH, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "tech.html"));
 });
 
@@ -126,14 +131,14 @@ app.use('/', express.static(path.join(__dirname, 'public')));
 /* ============================================================
    API: INDEX DASHBOARD — TODAY ONLY
 ============================================================ */
-app.get("/api/bookings", async (req,res)=>{
+app.get("/api/bookings", async (req, res) => {
   try {
     const jwt = await getJwt();
     const todayUTC = getUTCDateOnly(new Date());
 
-    const {data} = await axios.get(`${BASE_URL}/scripts/api/v1/listbookings`, {
-      headers:{Accept:"application/json", Authorization:`Bearer ${jwt}`},
-      params:{limit:2000, _:Date.now()}
+    const { data } = await axios.get(`${BASE_URL}/scripts/api/v1/listbookings`, {
+      headers: { Accept: "application/json", Authorization: `Bearer ${jwt}` },
+      params: { limit: 2000, _: Date.now() }
     });
 
     let rows = data?.response || [];
@@ -147,21 +152,21 @@ app.get("/api/bookings", async (req,res)=>{
     // Expand
     let expanded = await expandBookings(rows);
 
-    // NEW: Hide truly collected bookings
+    // Hide truly collected bookings
     expanded = expanded.filter(b =>
       !(b.statuses && b.statuses.length > 0 && b.statuses.every(st => st.includes("collected")))
     );
 
-    res.json({success:true, bookings: expanded});
+    res.json({ success: true, bookings: expanded });
   } catch (e) {
-    res.json({success:false, error:e.message});
+    res.json({ success: false, error: e.message });
   }
 });
 
 /* ============================================================
    API: TECH DASHBOARD — TODAY OR TOMORROW
 ============================================================ */
-app.get("/api/bookings-tech", async (req,res)=>{
+app.get("/api/bookings-tech", async (req, res) => {
   try {
     const mode = req.query.day || "today";
     const jwt = await getJwt();
@@ -170,9 +175,9 @@ app.get("/api/bookings-tech", async (req,res)=>{
     const tomorrowUTC = new Date(todayUTC);
     tomorrowUTC.setUTCDate(todayUTC.getUTCDate() + 1);
 
-    const {data} = await axios.get(`${BASE_URL}/scripts/api/v1/listbookings`, {
-      headers:{Accept:"application/json", Authorization:`Bearer ${jwt}`},
-      params:{limit:2000, _:Date.now()}
+    const { data } = await axios.get(`${BASE_URL}/scripts/api/v1/listbookings`, {
+      headers: { Accept: "application/json", Authorization: `Bearer ${jwt}` },
+      params: { limit: 2000, _: Date.now() }
     });
 
     let rows = data?.response || [];
@@ -191,60 +196,126 @@ app.get("/api/bookings-tech", async (req,res)=>{
       !(b.statuses && b.statuses.length > 0 && b.statuses.every(st => st.includes("collected")))
     );
 
-    res.json({success:true, bookings: expanded});
+    res.json({ success: true, bookings: expanded });
   } catch (e) {
-    res.json({success:false, error:e.message});
+    res.json({ success: false, error: e.message });
   }
 });
 
 /* ============================================================
    API: TEACHERS DASHBOARD — ALL ACTIVE
 ============================================================ */
-app.get("/api/bookings-all", async (req,res)=>{
+app.get("/api/bookings-all", async (req, res) => {
   try {
     const jwt = await getJwt();
 
-    const {data} = await axios.get(`${BASE_URL}/scripts/api/v1/listbookings`, {
-      headers:{Accept:"application/json", Authorization:`Bearer ${jwt}`},
-      params:{limit:2000, _:Date.now()}
+    const { data } = await axios.get(`${BASE_URL}/scripts/api/v1/listbookings`, {
+      headers: { Accept: "application/json", Authorization: `Bearer ${jwt}` },
+      params: { limit: 2000, _: Date.now() }
     });
 
     let rows = data?.response || [];
-    const ignore = ["returned","complete","completed","cancel","reject","booking request"];
+    const ignore = ["returned", "complete", "completed", "cancel", "reject", "booking request"];
 
     rows = rows.filter(r =>
-      !ignore.some(x=>String(r.currentstatus).toLowerCase().includes(x))
+      !ignore.some(x => String(r.currentstatus).toLowerCase().includes(x))
     );
 
-    res.json({success:true, bookings:await expandBookings(rows)});
+    res.json({ success: true, bookings: await expandBookings(rows) });
   } catch (e) {
-    res.json({success:false, error:e.message});
+    res.json({ success: false, error: e.message });
   }
 });
 
 /* ============================================================
-   EXPAND BOOKINGS
+   API: BOOKINGS RANGE (used by calendar.html)
 ============================================================ */
-async function expandBookings(rows){
+app.get("/api/bookings-range", async (req, res) => {
+  try {
+    const start = new Date(req.query.start);
+    const end = new Date(req.query.end);
+    if (isNaN(start) || isNaN(end)) {
+      return res.json({ success: false, error: "Invalid start/end" });
+    }
+
+    const jwt = await getJwt();
+
+    const { data } = await axios.get(`${BASE_URL}/scripts/api/v1/listbookings`, {
+      headers: { Accept: "application/json", Authorization: `Bearer ${jwt}` },
+      params: { limit: 2000, _: Date.now() }
+    });
+
+    let rows = data?.response || [];
+
+    // Filter: start <= booking start < end, ignore request bookings
+    rows = rows.filter(r => {
+      const sd = new Date(r.startdatetime);
+      const notRequest = !String(r.currentstatus).toLowerCase().includes("booking request");
+      return notRequest && !isNaN(sd) && sd >= start && sd < end;
+    });
+
+    let expanded = await expandBookings(rows);
+
+    // Hide truly collected bookings
+    expanded = expanded.filter(b =>
+      !(b.statuses && b.statuses.length > 0 && b.statuses.every(st => st.includes("collected")))
+    );
+
+    res.json({ success: true, bookings: expanded });
+  } catch (e) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
+/* ============================================================
+   EXPAND BOOKINGS (INCLUDES enddatetime)
+============================================================ */
+
+function pickEndDatetime(r) {
+  // Try common shapes from APIs
+  return r.enddatetime || r.endDateTime || r.end_time || r.end || null;
+}
+
+async function expandBookings(rows) {
   const lists = await readLists();
   const statuses = await readStatuses();
   const readyIn = await readReadyIn();
 
   const grouped = {};
 
-  for (const r of rows){
+  for (const r of rows) {
     const user = r.username?.trim() || "Unknown";
     const bucket = getTimeBucket(r.startdatetime);
     const key = makeGroupKey(user, bucket);
 
+    const rawStart = r.startdatetime;
+    const rawEnd = pickEndDatetime(r);
+
     if (!grouped[key]) {
       grouped[key] = {
         username: user,
-        originalStart: r.startdatetime,
+        originalStart: rawStart || null,
+        originalEnd: rawEnd || null,
         startdatetime: bucket,
+        enddatetime: rawEnd || null,
         assets: [],
         statuses: []
       };
+    } else {
+      if (rawStart) {
+        const prev = grouped[key].originalStart ? new Date(grouped[key].originalStart) : null;
+        const cur = new Date(rawStart);
+        if (!prev || (!isNaN(cur) && cur < prev)) grouped[key].originalStart = rawStart;
+      }
+    }
+
+    if (rawEnd) {
+      const prevEnd = grouped[key].enddatetime ? new Date(grouped[key].enddatetime) : null;
+      const curEnd = new Date(rawEnd);
+      if (!prevEnd || (!isNaN(curEnd) && curEnd > prevEnd)) {
+        grouped[key].enddatetime = rawEnd;
+        grouped[key].originalEnd = rawEnd;
+      }
     }
 
     grouped[key].assets.push({
@@ -255,12 +326,12 @@ async function expandBookings(rows){
     grouped[key].statuses.push(String(r.currentstatus).toLowerCase());
   }
 
-  return Object.values(grouped).map(b=>{
+  return Object.values(grouped).map(b => {
     let status = "Not Picked";
     const lower = b.statuses;
 
-    const pickedWords = ["picked","ready","collected","issued","prepar"];
-    const picked = lower.filter(st => pickedWords.some(w=>st.includes(w))).length;
+    const pickedWords = ["picked", "ready", "collected", "issued", "prepar"];
+    const picked = lower.filter(st => pickedWords.some(w => st.includes(w))).length;
 
     if (picked === 0) status = "Not Picked";
     else if (picked < lower.length) status = "Preparing";
@@ -287,29 +358,27 @@ async function expandBookings(rows){
 /* ============================================================
    STATUS & READY IN
 ============================================================ */
-app.post("/api/update-status", async (req,res)=>{
-  const {key, status} = req.body;
+app.post("/api/update-status", async (req, res) => {
+  const { key, status } = req.body;
   const statuses = await readStatuses();
   if (status === "clear") delete statuses[key];
   else statuses[key] = status.toLowerCase();
   await writeJson(STATUS_FILE, statuses);
-  res.json({success:true});
+  res.json({ success: true });
 });
 
-app.post("/api/ready-in", async (req,res)=>{
-  const {key, minutes} = req.body;
+app.post("/api/ready-in", async (req, res) => {
+  const { key, minutes } = req.body;
   const r = await readReadyIn();
   r[key] = Math.max(0, Number(minutes));
   await writeJson(READYIN_FILE, r);
-  res.json({success:true});
+  res.json({ success: true });
 });
 
 /* ============================================================
    START SERVER
 ============================================================ */
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, ()=>{
+app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Tech dashboard uses /api/bookings-tech`);
-  console.log(`Teachers dashboard uses /api/bookings-all`);
 });

@@ -1,0 +1,708 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Studio Spaces Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{
+      --bg0:#07140e;
+      --bg1:#0b1b12;
+      --border:rgba(180, 255, 210, 0.14);
+      --border2:rgba(180, 255, 210, 0.10);
+      --text:#e9fff1;
+      --muted:rgba(233,255,241,.72);
+      --accent:#39d98a;
+      --accent2:#1fb16e;
+      --accentGlow:rgba(57,217,138,.35);
+    }
+
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;background:var(--bg0);color:var(--text)}
+    header{
+      padding:14px;background:linear-gradient(180deg,var(--bg1),var(--bg0));
+      display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+      border-bottom:1px solid var(--border2);
+    }
+    h1{margin:0;font-size:18px}
+    #clock{opacity:.9;font-size:12px;color:var(--muted)}
+
+    .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .btn{
+      padding:7px 12px;border-radius:999px;border:1px solid var(--border);
+      background:rgba(255,255,255,.04);color:var(--text);font-weight:950;cursor:pointer;
+      font-size:12px;transition:.12s;
+    }
+    .btn:hover{border-color:rgba(180,255,210,.22)}
+    .btn:active{transform:translateY(1px)}
+    .btn.active{
+      background:linear-gradient(180deg,var(--accent),var(--accent2));
+      color:#062012;
+      border-color:rgba(57,217,138,.85);
+      box-shadow:0 0 14px var(--accentGlow);
+    }
+    input[type="date"]{
+      padding:7px 10px;border-radius:999px;border:1px solid var(--border);
+      background:rgba(255,255,255,.04);color:var(--text);font-weight:950;font-size:12px;
+      outline:none;
+    }
+
+    main{padding:14px}
+    .subhead{
+      display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;
+      margin-bottom:10px
+    }
+    .badge{
+      display:inline-block;padding:6px 10px;border-radius:999px;
+      border:1px solid var(--border);background:rgba(255,255,255,.04);
+      font-weight:950;font-size:12px;color:var(--text)
+    }
+    .muted{opacity:.75;color:var(--muted)}
+    .mono{font-variant-numeric:tabular-nums}
+
+    .studioRow{
+      display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+      margin-bottom:12px;
+      padding:10px;
+      border:1px solid var(--border2);
+      border-radius:12px;
+      background:rgba(255,255,255,.03);
+      max-width:1900px;
+      margin-left:auto;
+      margin-right:auto;
+    }
+
+    .scaleWrap{
+      transform: scale(0.85);
+      transform-origin: top center;
+      width: calc(100% / 0.85);
+      margin-left: calc((100% - (100% / 0.85)) / 2);
+    }
+    .shrink10{
+      transform: scale(0.9);
+      transform-origin: top center;
+      width: calc(100% / 0.9);
+      margin-left: calc((100% - (100% / 0.9)) / 2);
+    }
+
+    .twoWrap{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+      max-width: 1900px;
+      margin: 0 auto;
+    }
+    @media (min-width: 1900px){
+      .twoWrap{grid-template-columns: 1fr 1fr;}
+    }
+
+    .grid{
+      border:1px solid var(--border2);
+      border-radius:10px;
+      overflow:hidden;
+      background:rgba(255,255,255,0.02);
+      margin:0 auto;
+      width:100%;
+    }
+    .grid.weekMax{max-width:1900px}
+    .grid.twoMax{max-width:1900px}
+    .grid.monthMax{max-width:1450px}
+
+    .boxTitle{
+      padding:10px 12px;
+      border-bottom:1px solid var(--border2);
+      background:rgba(255,255,255,0.03);
+      font-weight:950;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      font-size:12px;
+      color:var(--text);
+    }
+    .boxTitle .right{opacity:.75;font-weight:900;color:var(--muted)}
+
+    .wkgrid{
+      display:grid;
+      grid-template-columns: 92px repeat(5, minmax(240px, 1fr));
+    }
+    .wkgrid.compact{
+      grid-template-columns: 80px repeat(5, minmax(170px, 1fr));
+    }
+
+    .cell{
+      padding:8px 8px;
+      border-top:1px solid var(--border2);
+      border-left:1px solid var(--border2);
+      background:rgba(255,255,255,0.02);
+      font-size:12px;
+      min-height:110px;
+      color:var(--text);
+    }
+    .wkgrid.compact .cell{min-height:96px;padding:7px}
+    .cell:first-child{border-left:none}
+
+    .head{
+      background:rgba(255,255,255,0.04);
+      font-weight:950;
+      border-top:none;
+      min-height:auto;
+      font-size:13.5px;
+    }
+    .rowhead{
+      background:rgba(255,255,255,0.03);
+      font-weight:950;
+      border-left:none;
+      min-height:auto;
+      color:var(--text);
+    }
+    .rowlabel{display:flex;flex-direction:column;gap:2px}
+    .rowlabel .big{font-size:13.5px}
+    .rowlabel .small{font-size:11.5px;opacity:.78;font-weight:900;color:var(--muted)}
+
+    .slot{display:flex;flex-direction:column;gap:6px;align-items:stretch}
+
+    .pillRow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px}
+    .pill{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:3px 8px;border-radius:999px;
+      border:1px solid rgba(180,255,210,0.16);
+      background:rgba(255,255,255,0.03);
+      font-weight:950;
+      font-size:11px;
+      color:var(--text);
+    }
+    .pill.muted{opacity:.85;color:var(--muted);font-weight:900}
+
+    .bk{
+      border-radius:10px;
+      border:1px solid rgba(180,255,210,0.14);
+      padding:8px;
+      background:rgba(255,255,255,0.04);
+    }
+    .wkgrid.compact .bk{padding:7px}
+    .bk .name{font-weight:950;line-height:1.15}
+    .bk .meta{margin-top:4px;font-size:11px;opacity:.78;line-height:1.25;color:var(--muted)}
+    .asset-item{display:block;padding:2px 0;border-bottom:1px dashed rgba(180,255,210,.16)}
+    .asset-item:last-child{border-bottom:none}
+
+    .c1{background:rgba(57,217,138,0.14); border-color:rgba(57,217,138,0.34)}
+    .c2{background:rgba(46,196,140,0.12); border-color:rgba(46,196,140,0.30)}
+    .c3{background:rgba(32,156,110,0.12); border-color:rgba(32,156,110,0.28)}
+    .c4{background:rgba(22,128,90,0.12); border-color:rgba(22,128,90,0.26)}
+    .c5{background:rgba(90,220,160,0.10); border-color:rgba(90,220,160,0.26)}
+
+    .monthgrid{display:grid;grid-template-columns: repeat(5, minmax(190px, 1fr));}
+    .monthhead{
+      padding:7px 7px;background:rgba(255,255,255,0.04);
+      font-weight:950;border-left:1px solid var(--border2);font-size:12px;color:var(--text);
+    }
+    .monthhead:first-child{border-left:none}
+
+    .monthcell{
+      padding:6px 7px;
+      border-top:1px solid var(--border2);border-left:1px solid var(--border2);
+      min-height:105px;background:rgba(255,255,255,0.02);
+      font-size:11px;color:var(--text);
+    }
+    .monthcell:nth-child(5n+1){border-left:none}
+    .monthcell.dim{opacity:.45}
+
+    .datechip{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-weight:950}
+    .dnum{
+      height:26px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;
+      background:rgba(255,255,255,0.04);border:1px solid rgba(180,255,210,0.14);
+      font-size:12.5px;padding:0 9px;width:auto;
+    }
+
+    .lanes{display:grid;grid-template-columns: 1fr;gap:5px}
+    .lane{
+      border:1px solid rgba(180,255,210,0.12);
+      border-radius:10px;background:rgba(255,255,255,0.02);padding:5px;
+    }
+    .lane-title{
+      font-weight:950;font-size:10.5px;opacity:.85;
+      display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;color:var(--text);
+    }
+    .lane-title span{opacity:.75;font-weight:900;color:var(--muted)}
+    .bk.compact{padding:5px;border-radius:9px}
+    .bk.compact .name{font-size:11px}
+    .bk.compact .meta{display:none}
+
+    .empty{
+      opacity:.85;font-size:12px;padding:12px;border:1px solid var(--border2);
+      border-radius:10px;background:rgba(255,255,255,0.03);
+      max-width:1450px;margin:0 auto;color:var(--text);
+    }
+
+    @media (max-width: 1100px){
+      .wkgrid{grid-template-columns: 92px repeat(5, minmax(170px, 1fr))}
+      .wkgrid.compact{grid-template-columns: 80px repeat(5, minmax(150px, 1fr))}
+      .monthgrid{grid-template-columns: repeat(5, minmax(150px, 1fr))}
+      .grid.weekMax,.grid.twoMax,.grid.monthMax{max-width:100%}
+      .scaleWrap,.shrink10{width:100%;margin-left:0;transform:none;}
+      .studioRow{max-width:100%}
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Studio Spaces Dashboard</h1>
+    <div id="clock">Loading...</div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="prevBtn">←</button>
+    <input type="date" id="datePick" />
+    <button class="btn" id="nextBtn">→</button>
+
+    <button class="btn active" id="weekBtn">Week</button>
+    <button class="btn" id="twoWeeksBtn">2 Weeks</button>
+    <button class="btn" id="monthBtn">Month</button>
+  </div>
+</header>
+
+<main>
+  <div class="subhead">
+    <div class="badge" id="studioBadge">Showing: Studio 4</div>
+    <div id="rangeInfo" class="muted mono"></div>
+  </div>
+
+  <div class="studioRow" id="studioRow">
+    <button class="btn" data-studio="ALL">All</button>
+    <button class="btn active" data-studio="Studio 4">Studio 4</button>
+    <button class="btn" data-studio="Studio 3A">Studio 3A</button>
+    <button class="btn" data-studio="Studio 3B">Studio 3B</button>
+    <button class="btn" data-studio="Sound Mix Room">Sound Mix Room</button>
+    <button class="btn" data-studio="Sound Record Room">Sound Record Room</button>
+  </div>
+
+  <div class="scaleWrap">
+    <div id="calendarWrap"></div>
+  </div>
+</main>
+
+<script>
+  const SPACES = ["Studio 4","Studio 3A","Studio 3B","Sound Mix Room","Sound Record Room"];
+
+  const AM_START="09:30", AM_END="11:30";
+  const PM_START="13:30", PM_END="16:30";
+
+  let selectedStudio="Studio 4";
+  let viewMode="week";
+  let baseDate=new Date();
+
+  const clockEl=document.getElementById("clock");
+  const datePick=document.getElementById("datePick");
+  const prevBtn=document.getElementById("prevBtn");
+  const nextBtn=document.getElementById("nextBtn");
+  const weekBtn=document.getElementById("weekBtn");
+  const twoWeeksBtn=document.getElementById("twoWeeksBtn");
+  const monthBtn=document.getElementById("monthBtn");
+  const studioBadge=document.getElementById("studioBadge");
+  const rangeInfo=document.getElementById("rangeInfo");
+  const calendarWrap=document.getElementById("calendarWrap");
+  const studioBtns=Array.from(document.querySelectorAll("#studioRow button[data-studio]"));
+
+  function updateClock(){
+    clockEl.textContent=new Date().toLocaleString("en-GB",{timeZone:"Europe/London"});
+  }
+  setInterval(updateClock,1000); updateClock();
+
+  function toDateInputValue(d){
+    const x=new Date(d);
+    const yyyy=x.getFullYear();
+    const mm=String(x.getMonth()+1).padStart(2,"0");
+    const dd=String(x.getDate()).padStart(2,"0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  datePick.value=toDateInputValue(baseDate);
+
+  function escapeHtml(s){
+    return String(s ?? "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  function startOfDay(d){const x=new Date(d);x.setHours(0,0,0,0);return x;}
+  function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
+  function startOfWeekMonday(d){
+    const x=startOfDay(d);
+    const day=x.getDay();
+    const diff=(day===0?-6:1-day);
+    return addDays(x,diff);
+  }
+  function startOfMonth(d){const x=startOfDay(d);x.setDate(1);return x;}
+  function endOfMonthExclusive(d){const x=startOfMonth(d);x.setMonth(x.getMonth()+1);return x;}
+  function dateKey(d){
+    const yyyy=d.getFullYear();
+    const mm=String(d.getMonth()+1).padStart(2,"0");
+    const dd=String(d.getDate()).padStart(2,"0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  function formatDayLabel(d){return d.toLocaleDateString("en-GB",{weekday:"short",day:"2-digit",month:"short"});}
+  function formatMonthLabel(d){return d.toLocaleDateString("en-GB",{month:"long",year:"numeric"});}
+  function hhmmToMin(hhmm){const [h,m]=hhmm.split(":").map(Number);return h*60+m;}
+  function fmtTime(iso){
+    const d=new Date(iso);
+    if (isNaN(d)) return "";
+    return d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+  }
+
+  function ordinal(n){
+    const v=n%100;
+    if(v>=11 && v<=13) return n+"th";
+    switch(n%10){
+      case 1:return n+"st";
+      case 2:return n+"nd";
+      case 3:return n+"rd";
+      default:return n+"th";
+    }
+  }
+
+  function periodForIso(iso){
+    const d=new Date(iso);
+    if(isNaN(d)) return null;
+    const mins=d.getHours()*60 + d.getMinutes();
+    const amS=hhmmToMin(AM_START), amE=hhmmToMin(AM_END);
+    const pmS=hhmmToMin(PM_START), pmE=hhmmToMin(PM_END);
+    if(mins>=amS && mins<amE) return "AM";
+    if(mins>=pmS && mins<pmE) return "PM";
+    return null;
+  }
+
+  function detectSpace(b){
+    const assets = (b.assets || []).map(a => String(a.name || "").toLowerCase());
+    for (const space of SPACES){
+      const s = space.toLowerCase();
+      if (assets.some(n => n.includes(s))) return space;
+    }
+    return null;
+  }
+
+  function bookingMatchesSelection(b){
+    const space = detectSpace(b);
+    if (selectedStudio === "ALL") return !!space; // ONLY studio spaces
+    return space === selectedStudio;
+  }
+
+  function otherAssetsList(b, spaceName){
+    const s = String(spaceName || "").toLowerCase();
+    const names=(b.assets||[])
+      .map(a=>String(a.name||"").trim())
+      .filter(n=>n && !n.toLowerCase().includes(s));
+    return names;
+  }
+
+  function colorClass(i){
+    const classes=["c1","c2","c3","c4","c5"];
+    return classes[i%classes.length];
+  }
+
+  async function fetchRange(start,end){
+    const url=`/api/bookings-range?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`;
+    const r=await fetch(url);
+    const data=await r.json();
+    if(!data.success) throw new Error(data.error || "Fetch failed");
+    return Array.isArray(data.bookings)?data.bookings:[];
+  }
+
+  function timeRangeText(b){
+    const st = fmtTime(b.startdatetime);
+
+    // Prefer real enddatetime from server.js
+    let en = "";
+    if (b.enddatetime) en = fmtTime(b.enddatetime);
+
+    // If still missing, fall back to slot end
+    if (!en) {
+      const period = periodForIso(b.startdatetime);
+      if (period === "AM") en = AM_END;
+      else if (period === "PM") en = PM_END;
+    }
+
+    return (st && en) ? `${st}–${en}` : (st || "");
+  }
+
+  function renderBookingCard(b, idx, compact){
+    const cls=colorClass(idx);
+    const space = detectSpace(b) || (selectedStudio === "ALL" ? "Unknown Space" : selectedStudio);
+    const assets = otherAssetsList(b, space);
+    const tTip = `${timeRangeText(b)} • ${space}`;
+
+    if(compact){
+      return `
+        <div class="bk compact ${cls}" title="${escapeHtml(tTip)}">
+          <div class="pillRow">
+            <span class="pill">${escapeHtml(space)}</span>
+            <span class="pill muted">${escapeHtml(timeRangeText(b))}</span>
+          </div>
+          <div class="name">${escapeHtml(b.username)}</div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="bk ${cls}" title="${escapeHtml(tTip)}">
+        <div class="pillRow">
+          <span class="pill">${escapeHtml(space)}</span>
+          <span class="pill muted">${escapeHtml(timeRangeText(b))}</span>
+        </div>
+        <div class="name">${escapeHtml(b.username)}</div>
+        <div class="meta">
+          ${assets.length ? assets.map(a=>`<span class="asset-item">${escapeHtml(a)}</span>`).join("") : `<span class="asset-item">${escapeHtml(space)}</span>`}
+        </div>
+      </div>
+    `;
+  }
+
+  function buildIndex(bookings){
+    const idx={};
+    for(const b of bookings){
+      const d=new Date(b.startdatetime);
+      if(isNaN(d)) continue;
+
+      const p=periodForIso(b.startdatetime);
+      if(!p) continue;
+
+      const dk=dateKey(d);
+      if(!idx[dk]) idx[dk]={AM:[],PM:[]};
+      idx[dk][p].push(b);
+    }
+    for(const dk of Object.keys(idx)){
+      idx[dk].AM.sort((a,b)=>new Date(a.startdatetime)-new Date(b.startdatetime));
+      idx[dk].PM.sort((a,b)=>new Date(a.startdatetime)-new Date(b.startdatetime));
+    }
+    return idx;
+  }
+
+  function renderWeekBox(monDate, index, label, maxClass, compactGrid){
+    const days=[0,1,2,3,4].map(i=>addDays(monDate,i));
+    const fri=addDays(monDate,4);
+
+    let html=`<div class="grid ${maxClass}">`;
+    html+=`
+      <div class="boxTitle">
+        <div>${escapeHtml(label)}</div>
+        <div class="right">${escapeHtml(formatDayLabel(monDate))} → ${escapeHtml(formatDayLabel(fri))}</div>
+      </div>
+    `;
+
+    html+=`<div class="wkgrid ${compactGrid?"compact":""}">`;
+
+    html+=`<div class="cell head rowhead">Period</div>`;
+    for(const d of days) html+=`<div class="cell head">${escapeHtml(formatDayLabel(d))}</div>`;
+
+    html+=`
+      <div class="cell rowhead">
+        <div class="rowlabel"><div class="big">AM</div><div class="small">${escapeHtml(AM_START)}–${escapeHtml(AM_END)}</div></div>
+      </div>`;
+    for(const d of days){
+      const dk=dateKey(d);
+      const list=(index[dk]?.AM)||[];
+      html+=`<div class="cell"><div class="slot">`;
+      if(!list.length) html+=`<div class="muted" style="font-size:11px;">—</div>`;
+      else list.forEach((b,i)=> html+=renderBookingCard(b,i,false));
+      html+=`</div></div>`;
+    }
+
+    html+=`
+      <div class="cell rowhead">
+        <div class="rowlabel"><div class="big">PM</div><div class="small">${escapeHtml(PM_START)}–${escapeHtml(PM_END)}</div></div>
+      </div>`;
+    for(const d of days){
+      const dk=dateKey(d);
+      const list=(index[dk]?.PM)||[];
+      html+=`<div class="cell"><div class="slot">`;
+      if(!list.length) html+=`<div class="muted" style="font-size:11px;">—</div>`;
+      else list.forEach((b,i)=> html+=renderBookingCard(b,i,false));
+      html+=`</div></div>`;
+    }
+
+    html+=`</div></div>`;
+    return html;
+  }
+
+  function renderWeekView(startMonday, bookings){
+    const index=buildIndex(bookings);
+    calendarWrap.innerHTML = renderWeekBox(startMonday,index,"Week View","weekMax",false);
+  }
+
+  function renderTwoWeeksView(startMonday, bookings){
+    const index=buildIndex(bookings);
+    const monday2=addDays(startMonday,7);
+
+    calendarWrap.innerHTML =
+      `<div class="shrink10">` +
+        `<div class="twoWrap">` +
+          renderWeekBox(startMonday,index,"Week 1","twoMax",true) +
+          renderWeekBox(monday2,index,"Week 2","twoMax",true) +
+        `</div>` +
+      `</div>`;
+  }
+
+  function renderMonthGrid(anchorDate, bookings){
+    const monthStart=startOfMonth(anchorDate);
+    const monthEnd=endOfMonthExclusive(anchorDate);
+
+    const firstMonday=startOfWeekMonday(monthStart);
+    const lastDay=addDays(monthEnd,-1);
+    const lastMonday=startOfWeekMonday(lastDay);
+
+    const weekMondays=[];
+    for(let d=new Date(firstMonday); d<=lastMonday; d=addDays(d,7)) weekMondays.push(new Date(d));
+
+    const byDay=buildIndex(bookings);
+    const heads=["Mon","Tue","Wed","Thu","Fri"];
+
+    let html=`<div class="shrink10"><div class="grid monthMax">`;
+    html+=`
+      <div class="boxTitle">
+        <div>${escapeHtml(formatMonthLabel(anchorDate))}</div>
+        <div class="right">Mon–Fri</div>
+      </div>
+    `;
+    html+=`<div class="monthgrid" style="border-bottom:1px solid rgba(180,255,210,0.10)">`;
+    for(const h of heads) html+=`<div class="monthhead">${h}</div>`;
+    html+=`</div>`;
+
+    html+=`<div class="monthgrid">`;
+    for(const mon of weekMondays){
+      for(let i=0;i<5;i++){
+        const d=addDays(mon,i);
+        const inMonth=d.getMonth()===monthStart.getMonth();
+        const dk=dateKey(d);
+
+        const amList=byDay[dk]?.AM||[];
+        const pmList=byDay[dk]?.PM||[];
+
+        html+=`<div class="monthcell${inMonth?"":" dim"}">`;
+        html+=`
+          <div class="datechip">
+            <span class="dnum mono">${escapeHtml(ordinal(d.getDate()))}</span>
+            <span class="muted">${escapeHtml(inMonth?"":d.toLocaleDateString("en-GB",{month:"short"}))}</span>
+          </div>
+        `;
+
+        html+=`<div class="lanes">`;
+
+        html+=`<div class="lane"><div class="lane-title">AM <span>${escapeHtml(AM_START)}–${escapeHtml(AM_END)}</span></div>`;
+        if(!amList.length) html+=`<div class="muted" style="font-size:11px;">—</div>`;
+        else amList.forEach((b,idx)=> html+=renderBookingCard(b,idx,true));
+        html+=`</div>`;
+
+        html+=`<div class="lane"><div class="lane-title">PM <span>${escapeHtml(PM_START)}–${escapeHtml(PM_END)}</span></div>`;
+        if(!pmList.length) html+=`<div class="muted" style="font-size:11px;">—</div>`;
+        else pmList.forEach((b,idx)=> html+=renderBookingCard(b,idx,true));
+        html+=`</div>`;
+
+        html+=`</div></div>`;
+      }
+    }
+    html+=`</div></div></div>`;
+    calendarWrap.innerHTML=html;
+  }
+
+  async function load(){
+    const d=startOfDay(baseDate);
+
+    studioBadge.textContent = (selectedStudio === "ALL")
+      ? "Showing: All studio spaces"
+      : `Showing: ${selectedStudio}`;
+
+    let rangeStart, rangeEnd;
+
+    if(viewMode==="week"){
+      const ws=startOfWeekMonday(d);
+      rangeStart=ws; rangeEnd=addDays(ws,7);
+      rangeInfo.textContent=`${formatDayLabel(ws)} → ${formatDayLabel(addDays(ws,4))}`;
+    }else if(viewMode==="twoweeks"){
+      const ws=startOfWeekMonday(d);
+      rangeStart=ws; rangeEnd=addDays(ws,14);
+      rangeInfo.textContent=`${formatDayLabel(ws)} → ${formatDayLabel(addDays(ws,11))}`;
+    }else{
+      const ms=startOfMonth(d);
+      const firstMonday=startOfWeekMonday(ms);
+      const lastDay=addDays(endOfMonthExclusive(d),-1);
+      const lastMonday=startOfWeekMonday(lastDay);
+      rangeStart=firstMonday; rangeEnd=addDays(lastMonday,7);
+      rangeInfo.textContent=`${formatMonthLabel(d)}`;
+    }
+
+    try{
+      let bookings=await fetchRange(rangeStart,rangeEnd);
+      bookings = bookings.filter(bookingMatchesSelection);
+
+      const monday=startOfWeekMonday(d);
+
+      if(viewMode==="week") renderWeekView(monday, bookings);
+      else if(viewMode==="twoweeks") renderTwoWeeksView(monday, bookings);
+      else renderMonthGrid(d, bookings);
+    }catch(e){
+      calendarWrap.innerHTML=`
+        <div class="empty">
+          <b>Failed to load.</b>
+          <div class="muted" style="margin-top:6px">${escapeHtml(e.message||e)}</div>
+        </div>
+      `;
+    }
+  }
+
+  function setActive(btn, group){
+    group.forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+  }
+
+  studioBtns.forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const val=btn.getAttribute("data-studio");
+      if(!val) return;
+      selectedStudio=val;
+      setActive(btn, studioBtns);
+      load();
+    });
+  });
+
+  weekBtn.addEventListener("click",()=>{
+    viewMode="week";
+    setActive(weekBtn,[weekBtn,twoWeeksBtn,monthBtn]);
+    load();
+  });
+  twoWeeksBtn.addEventListener("click",()=>{
+    viewMode="twoweeks";
+    setActive(twoWeeksBtn,[weekBtn,twoWeeksBtn,monthBtn]);
+    load();
+  });
+  monthBtn.addEventListener("click",()=>{
+    viewMode="month";
+    setActive(monthBtn,[weekBtn,twoWeeksBtn,monthBtn]);
+    load();
+  });
+
+  datePick.addEventListener("change",()=>{
+    const val=datePick.value;
+    if(!val) return;
+    baseDate=new Date(val+"T00:00:00");
+    load();
+  });
+
+  prevBtn.addEventListener("click",()=>{
+    baseDate=addDays(baseDate, viewMode==="month" ? -30 : viewMode==="twoweeks" ? -14 : -7);
+    datePick.value=toDateInputValue(baseDate);
+    load();
+  });
+  nextBtn.addEventListener("click",()=>{
+    baseDate=addDays(baseDate, viewMode==="month" ? 30 : viewMode==="twoweeks" ? 14 : 7);
+    datePick.value=toDateInputValue(baseDate);
+    load();
+  });
+
+  setInterval(load, 5000);
+  load();
+</script>
+</body>
+</html>
