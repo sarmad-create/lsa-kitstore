@@ -105,6 +105,23 @@ function categoryFromLists(name, lists) {
    ROUTES — PAGES
 ============================================================ */
 
+/**
+ * ✅ NEW: Homepage hub at "/"
+ * This assumes you will create a NEW public/index.html for the homepage.
+ * (Your existing dashboard index.html should be renamed to public/today.html)
+ */
+app.get(["/", "/index.html", "/home"], (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+/**
+ * ✅ NEW: Today's dashboard moved to /today
+ * This assumes your old index.html is now public/today.html
+ */
+app.get(["/today", "/today.html"], (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "today.html"));
+});
+
 app.get("/teachers", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "teachers.html"));
 });

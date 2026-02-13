@@ -2,126 +2,196 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Siso Collections Dashboard</title>
+  <title>LSA Kitstore Hub — Home</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;background:#0b1320;color:#e6eef8}
-    header{padding:16px;background:#071126;display:flex;justify-content:space-between;align-items:center}
-    h1{margin:0;font-size:20px}
-    #pageInfo{font-size:14px;opacity:0.85}
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:12px;text-align:left;vertical-align:top}
-    tr:not(:first-child){border-top:1px solid rgba(255,255,255,0.06)}
+    :root{
+      --card: rgba(255,255,255,.05);
+      --border: rgba(255,255,255,.10);
+      --text: #e9fff1;
+      --muted: rgba(233,255,241,.72);
 
-    .status{font-weight:600;padding:6px 12px;border-radius:8px;display:inline-block}
-    .status.notpicked{background:#6b1f1f;color:#ffecec}
-    .status.preparing{background:#6b4d1f;color:#fff8e0}
-    .status.ready{background:#1e4f2d;color:#ffffff;animation:readyGlow 2.8s ease-in-out infinite alternate}
-    @keyframes readyGlow{from{transform:scale(1);box-shadow:0 0 0 rgba(0,255,120,0)}to{transform:scale(1.03);box-shadow:0 0 20px rgba(0,255,120,0.4)}}
+      --green:#39d98a;
+      --blue:#4ea1ff;
+    }
 
-    .ready-in-note{display:inline-block;margin-left:8px;font-size:12px;opacity:.9;background:rgba(255,255,255,0.08);padding:4px 8px;border-radius:6px}
+    body{
+      margin:0;
+      font-family:system-ui,Segoe UI,Roboto,Arial;
+      background:
+        radial-gradient(900px 500px at 15% 10%, rgba(57,217,138,.18), transparent 60%),
+        radial-gradient(900px 500px at 85% 15%, rgba(78,161,255,.18), transparent 60%),
+        #061018;
+      color:var(--text);
+      min-height:100vh;
+    }
 
-    .asset-pill{display:inline-block;border-radius:8px;padding:6px 10px;margin:3px 4px 0 0;font-weight:600}
-    .asset-video{background-color:rgba(128,0,128,0.25); color:#efe8ff}
-    .asset-sound{background-color:rgba(200,50,50,0.25); color:#ffecec}
-    .asset-lighting{background-color:rgba(255,235,59,0.45); color:#ffffff}
-    .asset-grip{background-color:rgba(0,123,255,0.28); color:#eaf2ff}
-    .asset-uncategorised,.asset-uncategorized{background-color:rgba(200,200,200,0.18); color:#e6eef8}
+    header{
+      padding:16px;
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      border-bottom:1px solid var(--border);
+      display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
+    }
+    h1{margin:0;font-size:18px;letter-spacing:.2px}
+    #clock{opacity:.9;font-size:12px;color:var(--muted)}
 
-    .legend{font-size:12px;opacity:.95;margin-bottom:8px}
+    main{padding:16px; max-width:1000px; margin:0 auto;}
+
+    .logo-wrap{
+      text-align:center;
+      margin:10px 0 18px;
+    }
+    .logo-wrap img{
+      max-width:210px;
+      width:60%;
+      height:auto;
+      opacity:0.95;
+    }
+
+    .intro-card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:16px;
+      margin-bottom:18px;
+      text-align:center;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.5;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap:16px;
+      justify-items:center;
+    }
+
+    .card{
+      grid-column: span 12;
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:20px;
+      width:100%;
+      max-width:280px;
+      text-align:center;
+      backdrop-filter: blur(6px);
+    }
+
+    @media(min-width:700px){
+      .card{ grid-column: span 4; }
+    }
+
+    .card h2{
+      margin:0 0 8px;
+      font-size:15px;
+    }
+    .card p{
+      margin:0 0 14px;
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:10px 16px;
+      border-radius:999px;
+      text-decoration:none;
+      font-weight:900;
+      font-size:13px;
+      color:var(--text);
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.05);
+      transition: transform .08s ease, background .12s ease;
+      min-width:140px;
+    }
+    .btn:hover{transform:translateY(-1px); background:rgba(255,255,255,.09)}
+    .btn:active{transform:translateY(1px)}
+
+    .btn.green{border-color: rgba(57,217,138,.5)}
+    .btn.blue{border-color: rgba(78,161,255,.6)}
+
+    .btn.green:hover{background:rgba(57,217,138,.14)}
+    .btn.blue:hover{background:rgba(78,161,255,.14)}
+
+    /* === ONLY CHANGE: Teachers button darker tone === */
+.btn.teachers-dark{
+  border-color:#301016; /* darker outline only */
+}
+
+.btn.teachers-dark:hover{
+  background: rgba(48,16,22,.28); /* dark tint only on hover */
+}
+
+
+    footer{
+      text-align:center;
+      color:var(--muted);
+      font-size:12px;
+      padding:24px 0 8px;
+      opacity:.9;
+    }
   </style>
 </head>
 <body>
   <header>
-    <div>
-      <h1>Today's Collections</h1>
-      <div id="clock" style="opacity:.9;font-size:13px">Loading...</div>
-    </div>
-    <div><div id="pageInfo">Page 0 of 0</div></div>
+    <h1>LSA Kitstore Hub</h1>
+    <div id="clock">Loading…</div>
   </header>
 
-  <main style="padding:16px">
-    <div class="legend">
-      <span class="asset-pill asset-video">Video</span>
-      <span class="asset-pill asset-sound">Sound</span>
-      <span class="asset-pill asset-lighting">Lighting</span>
-      <span class="asset-pill asset-grip">Grip</span>
-      <span class="asset-pill asset-uncategorised">Uncategorised</span>
+  <main>
+
+    <!-- LOGO -->
+    <div class="logo-wrap">
+      <img src="/LSA Side Colour Neg.png" alt="LSA London Screen Academy Logo">
     </div>
-    <div id="tableWrap"></div>
+
+    <!-- INTRO -->
+    <div class="intro-card">
+      This homepage is a simple hub to quickly access the main Kitstore dashboards.
+    </div>
+
+    <!-- BUTTON GRID -->
+    <section class="grid">
+      <div class="card">
+        <h2>Today’s Equipment Bookings</h2>
+        <p>Daily collection and pickup view.</p>
+        <a class="btn blue" href="/today">Open Today</a>
+      </div>
+
+      <div class="card">
+        <h2>Studio Calendar</h2>
+        <p>Weekly and monthly studio booking schedule.</p>
+        <a class="btn green" href="/calendar">Open Calendar</a>
+      </div>
+
+      <div class="card">
+        <h2>Teachers & Departments Bookings</h2>
+        <p>Equipment breakdown and summaries.</p>
+        <!-- ONLY HTML CHANGE HERE -->
+        <a class="btn blue teachers-dark" href="/teachers">Open Teachers</a>
+      </div>
+    </section>
+
+    <footer>© <span id="year"></span> LSA Kitstore - SS</footer>
   </main>
 
   <script>
-    function statusClass(status){
-      const t=(status||'').toLowerCase();
-      if (t.includes('ready')) return 'ready';
-      if (t.includes('prepar')) return 'preparing';
-      if (t.includes('not')) return 'notpicked';
-      return t.replace(/\s+/g,'');
+    function tick(){
+      const now = new Date();
+      document.getElementById("clock").textContent =
+        now.toLocaleString("en-GB", {
+          timeZone:"Europe/London",
+          hour:"2-digit",
+          minute:"2-digit"
+        });
+      document.getElementById("year").textContent = now.getFullYear();
     }
-
-    let bookings=[],page=0;const pageSize=8;let rotateTimer=null;
-    const pageInfo=document.getElementById('pageInfo'),tableWrap=document.getElementById('tableWrap'),clockEl=document.getElementById('clock');
-
-    function updateClock(){clockEl.textContent=new Date().toLocaleString()}
-    setInterval(updateClock,1000);updateClock();
-
-    function formatTime(dt){if(!dt)return'';const d=new Date(dt);return isNaN(d)?dt:d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
-
-    function renderAssets(assets){
-      return (assets||[]).map(a=>{
-        const name = typeof a==='string'?a:(a.name||'');
-        const cat  = (typeof a==='object' && a.category) ? a.category : 'uncategorised';
-        const cls  = ['video','sound','lighting','grip','uncategorised'].includes((cat||'').toLowerCase()) ? cat.toLowerCase() : 'uncategorised';
-        return `<span class="asset-pill asset-${cls}">${name}</span>`;
-      }).join('');
-    }
-
-    function renderPage(){
-      const totalPages=Math.max(1,Math.ceil(bookings.length/pageSize));
-      if(page>=totalPages)page=0;
-      const start=page*pageSize;
-      const pageBookings=bookings.slice(start,start+pageSize);
-      pageInfo.textContent=`Page ${page+1} of ${totalPages} — ${bookings.length} total`;
-
-      let html = '<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th></tr></thead><tbody>';
-      if(!pageBookings.length){
-        html += '<tr><td colspan="4">No bookings for today.</td></tr>';
-      }else{
-        for(const b of pageBookings){
-          const time=formatTime(b.startdatetime);
-          const cls=statusClass(b.status);
-          const readyNote = (b.status!=='Ready for Collection' && Number(b.readyInMinutes)>0)
-            ? `<span class="ready-in-note">Ready in ${b.readyInMinutes} min</span>` : '';
-          html += `<tr>
-            <td>${time}</td>
-            <td>${b.username}</td>
-            <td><span class="status ${cls}">${b.status}</span>${readyNote}</td>
-            <td>${renderAssets(b.assets)}</td>
-          </tr>`;
-        }
-      }
-      html+='</tbody></table>';
-      tableWrap.innerHTML=html;
-    }
-
-    async function fetchBookings(){
-      try{
-        const resp=await fetch('/api/bookings');
-        const data=await resp.json();
-        bookings=(data.success&&Array.isArray(data.bookings))?data.bookings:[];
-        bookings.sort((a,b)=>new Date(a.startdatetime)-new Date(b.startdatetime));
-        page=0;renderPage();
-      }catch(e){console.error('Fetch bookings failed',e);}
-    }
-
-    function startAutoRotate(){stopAutoRotate();rotateTimer=setInterval(()=>{page++;renderPage()},10000)}
-    function stopAutoRotate(){if(rotateTimer){clearInterval(rotateTimer);rotateTimer=null}}
-
-    setInterval(fetchBookings,5000);
-    (async function(){await fetchBookings();startAutoRotate()})();
-    tableWrap.addEventListener('mouseover',stopAutoRotate);
-    tableWrap.addEventListener('mouseout',startAutoRotate);
+    tick(); 
+    setInterval(tick, 60000);
   </script>
 </body>
 </html>
