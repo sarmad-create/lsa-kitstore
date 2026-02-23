@@ -11,6 +11,7 @@ app.disable('x-powered-by');
 app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
+app.use(express.static('public'));
 
 /* ===== ENV ===== */
 const BASE_URL = process.env.SISO_BASE_URL || 'https://lsa.siso.co';
