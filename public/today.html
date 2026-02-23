@@ -12,7 +12,7 @@
     header{padding:16px;background:#071126;display:flex;justify-content:space-between;align-items:center}
     h1{margin:0;font-size:20px}
     #pageInfo{font-size:14px;opacity:0.85}
-    table{width:100%;border-collapse:collapse}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
     th,td{padding:12px;text-align:left;vertical-align:top}
     tr:not(:first-child){border-top:1px solid rgba(255,255,255,0.06)}
 
@@ -32,7 +32,15 @@
     .asset-uncategorised,.asset-uncategorized{background-color:rgba(200,200,200,0.18); color:#e6eef8}
 
     .legend{font-size:12px;opacity:.95;margin-bottom:8px}
-  </style>
+
+    /* Layout: keep columns consistent and let Equipment breathe even when grouped */
+    th:nth-child(1), td:nth-child(1){width:90px}
+    th:nth-child(2), td:nth-child(2){width:220px}
+    th:nth-child(3), td:nth-child(3){width:170px}
+    th:nth-child(4), td:nth-child(4){width:auto;text-align:left}
+    td{overflow-wrap:anywhere;word-break:break-word}
+
+</style>
 </head>
 <body>
   <header>
@@ -72,13 +80,35 @@
     function formatTime(dt){if(!dt)return'';const d=new Date(dt);return isNaN(d)?dt:d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
 
     function renderAssets(assets){
-      return (assets||[]).map(a=>{
-        const name = typeof a==='string'?a:(a.name||'');
+      if(!assets || !assets.length) return '';
+
+      // Count identical asset names and keep the first-seen category for styling
+      const counts = {};
+      const categories = {};
+
+      for(const a of assets){
+        const name = (typeof a==='string') ? a : (a.name||'');
         const cat  = (typeof a==='object' && a.category) ? a.category : 'uncategorised';
-        const cls  = ['video','sound','lighting','grip','uncategorised'].includes((cat||'').toLowerCase()) ? cat.toLowerCase() : 'uncategorised';
-        return `<span class="asset-pill asset-${cls}">${name}</span>`;
+        if(!name) continue;
+
+        if(!counts[name]){
+          counts[name]=0;
+          categories[name]=cat;
+        }
+        counts[name]++;
+      }
+
+      return Object.keys(counts).map(name=>{
+        const cat = categories[name] || 'uncategorised';
+        const cls = ['video','sound','lighting','grip','uncategorised','uncategorized']
+          .includes((cat||'').toLowerCase()) ? (cat||'uncategorised').toLowerCase() : 'uncategorised';
+
+        const label = counts[name] > 1 ? `${name} x${counts[name]}` : name;
+        return `<span class="asset-pill asset-${cls}">${label}</span>`;
       }).join('');
     }
+
+
 
     function renderPage(){
       const totalPages=Math.max(1,Math.ceil(bookings.length/pageSize));
