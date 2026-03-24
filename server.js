@@ -397,13 +397,6 @@ app.post("/api/ready-in", async (req, res) => {
    START SERVER
 ============================================================ */
 const PORT = process.env.PORT || 3000;
-
-// This allows the app to still run locally with 'node server.js'
-if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-  });
-}
-
-// This is what Vercel needs
-module.exports = app;
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
