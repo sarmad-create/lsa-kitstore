@@ -32,6 +32,7 @@
     .asset-uncategorised,.asset-uncategorized{background-color:rgba(200,200,200,0.18); color:#e6eef8}
 
     .legend{font-size:12px;opacity:.95;margin-bottom:8px}
+    #viewToggle{width:18px;height:18px;accent-color:#4da3ff}
 
     /* Layout: keep columns consistent and let Equipment breathe even when grouped */
     th:nth-child(1), td:nth-child(1){width:90px}
@@ -48,7 +49,13 @@
       <h1>Today's Collections</h1>
       <div id="clock" style="opacity:.9;font-size:13px">Loading...</div>
     </div>
-    <div><div id="pageInfo">Page 0 of 0</div></div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <label for="viewToggle" style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none">
+        <span id="viewLabel">Auto Mode</span>
+        <input id="viewToggle" type="checkbox" aria-label="Auto Mode" />
+      </label>
+      <div id="pageInfo">Page 0 of 0</div>
+    </div>
   </header>
 
   <main style="padding:16px">
@@ -71,8 +78,9 @@
       return t.replace(/\s+/g,'');
     }
 
-    let bookings=[],page=0;const pageSize=8;let rotateTimer=null;
+    let bookings=[],page=0;const pageSize=8;let rotateTimer=null;let singlePageMode=false;
     const pageInfo=document.getElementById('pageInfo'),tableWrap=document.getElementById('tableWrap'),clockEl=document.getElementById('clock');
+    const viewToggle=document.getElementById('viewToggle'),viewLabel=document.getElementById('viewLabel');
 
     function updateClock(){clockEl.textContent=new Date().toLocaleString()}
     setInterval(updateClock,1000);updateClock();
@@ -114,8 +122,10 @@
       const totalPages=Math.max(1,Math.ceil(bookings.length/pageSize));
       if(page>=totalPages)page=0;
       const start=page*pageSize;
-      const pageBookings=bookings.slice(start,start+pageSize);
-      pageInfo.textContent=`Page ${page+1} of ${totalPages} — ${bookings.length} total`;
+      const pageBookings=singlePageMode ? bookings : bookings.slice(start,start+pageSize);
+      pageInfo.textContent=singlePageMode
+        ? `Showing all bookings — ${bookings.length} total`
+        : `Page ${page+1} of ${totalPages} — ${bookings.length} total`;
 
       let html = '<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th></tr></thead><tbody>';
       if(!pageBookings.length){
@@ -142,19 +152,56 @@
       try{
         const resp=await fetch('/api/bookings');
         const data=await resp.json();
+        const previousTotalPages = Math.max(1, Math.ceil(bookings.length / pageSize));
         bookings=(data.success&&Array.isArray(data.bookings))?data.bookings:[];
         bookings.sort((a,b)=>new Date(a.startdatetime)-new Date(b.startdatetime));
-        page=0;renderPage();
+        const totalPages = Math.max(1, Math.ceil(bookings.length / pageSize));
+        if (page >= totalPages) page = 0;
+        renderPage();
+
+        if (!singlePageMode && totalPages > 1) {
+          ensureAutoRotate();
+        } else {
+          stopAutoRotate();
+        }
       }catch(e){console.error('Fetch bookings failed',e);}
     }
 
-    function startAutoRotate(){stopAutoRotate();rotateTimer=setInterval(()=>{page++;renderPage()},10000)}
+    function updateViewMode(){
+      const totalPages=Math.max(1,Math.ceil(bookings.length/pageSize));
+singlePageMode=!viewToggle.checked;
+      viewLabel.textContent='Auto Mode';
+      page=0;
+      renderPage();
+      if(singlePageMode || totalPages<=1){
+        stopAutoRotate();
+      }else{
+        startAutoRotate();
+      }
+    }
+
+    function startAutoRotate(){
+      stopAutoRotate();
+      const totalPages=Math.max(1,Math.ceil(bookings.length/pageSize));
+      if(singlePageMode || totalPages<=1) return;
+      rotateTimer=setInterval(()=>{
+        page = (page + 1) % totalPages;
+        renderPage();
+      },10000);
+    }
+    function ensureAutoRotate(){
+      const totalPages=Math.max(1,Math.ceil(bookings.length/pageSize));
+      if(singlePageMode || totalPages<=1){
+        stopAutoRotate();
+        return;
+      }
+      if(!rotateTimer) startAutoRotate();
+    }
     function stopAutoRotate(){if(rotateTimer){clearInterval(rotateTimer);rotateTimer=null}}
 
     setInterval(fetchBookings,5000);
-    (async function(){await fetchBookings();startAutoRotate()})();
-    tableWrap.addEventListener('mouseover',stopAutoRotate);
-    tableWrap.addEventListener('mouseout',startAutoRotate);
+    (async function(){await fetchBookings();updateViewMode()})();
+    viewToggle.addEventListener('change',updateViewMode);
   </script>
 </body>
 </html>

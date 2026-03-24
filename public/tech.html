@@ -19,11 +19,21 @@
       position: relative;
       width: 100%;
       height: 100%;
-      overflow-y: auto;
-      overflow-x: hidden;
+      overflow-x: auto;
+      overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
+      touch-action: pan-x;
+      overscroll-behavior-x: contain;
     }
 
+
+
+    #scrollSpacer{
+      width:100vh;
+      height:1px;
+      opacity:0;
+      pointer-events:none;
+    }
     /* Rotated dashboard */
     .rotate-90-ccw {
       position: absolute; /* changed from fixed */
@@ -192,7 +202,9 @@
 
 const canvas = document.getElementById("annotateCanvas");
 const ctx = canvas.getContext("2d");
-const scrollWrap = document.getElementById("scrollWrap");
+function getScrollWrap(){ return document.getElementById("scrollWrap"); }
+function getScrollSpacer(){ return document.getElementById("scrollSpacer"); }
+function getRotatedDashboard(){ return document.getElementById("rotatedDashboard"); }
 
 let drawing = false;
 let erasing = false;
@@ -246,7 +258,8 @@ function toggleAnnotate(){
     toggleDrawBtn.textContent = "DRAW ON";
     toggleDrawBtn.style.background = "#5cff89";
 
-    scrollWrap.style.overflow = "hidden";   // block scroll
+    const scrollWrap = getScrollWrap();
+    if (scrollWrap) scrollWrap.style.overflow = "hidden";   // block scroll
     canvas.style.touchAction = "none";      // allow drawing
 
   } else {
@@ -254,7 +267,11 @@ function toggleAnnotate(){
     toggleDrawBtn.textContent = "DRAW OFF";
     toggleDrawBtn.style.background = "rgba(255,255,255,0.35)";
 
-    scrollWrap.style.overflowY = "auto";    // enable scroll
+    const scrollWrap = getScrollWrap();
+    if (scrollWrap) {
+      scrollWrap.style.overflowX = "auto";    // enable rotated-page scroll
+      scrollWrap.style.overflowY = "hidden";
+    }
     canvas.style.touchAction = "auto";      // pass touch events through
   }
 }
@@ -302,8 +319,9 @@ canvas.addEventListener("pointercancel", ()=>{
 
 <!-- Dashboard Section -->
 <div id="scrollWrap">
+  <div id="scrollSpacer" aria-hidden="true"></div>
 
-<div class="rotate-90-ccw">
+<div class="rotate-90-ccw" id="rotatedDashboard">
   <header>
     <h1>Technician Dashboard</h1>
 
@@ -369,9 +387,47 @@ function formatTime(dt){
 }
 
 function renderAssets(arr){
-  return arr.map(a =>
-    `<span class="asset-pill asset-${a.category}">${a.name}</span>`
-  ).join("");
+  if (!Array.isArray(arr) || !arr.length) return "";
+
+  const counts = new Map();
+
+  for (const asset of arr){
+    const name = (asset && asset.name ? String(asset.name) : "").trim();
+    if (!name) continue;
+
+    const rawCategory = (asset && asset.category ? String(asset.category) : "uncategorised").toLowerCase();
+    const category = ["video","sound","lighting","grip","uncategorised","uncategorized"].includes(rawCategory)
+      ? rawCategory
+      : "uncategorised";
+
+    if (!counts.has(name)){
+      counts.set(name, { count: 0, category });
+    }
+
+    counts.get(name).count += 1;
+  }
+
+  return Array.from(counts.entries()).map(([name, info]) => {
+    const label = info.count > 1 ? `${name} x${info.count}` : name;
+    return `<span class="asset-pill asset-${info.category}">${label}</span>`;
+  }).join("");
+}
+
+function syncRotatedLayout(){
+  requestAnimationFrame(() => {
+    const rotatedDashboard = getRotatedDashboard();
+    const scrollSpacer = getScrollSpacer();
+    if (!rotatedDashboard || !scrollSpacer) return;
+
+    const rect = rotatedDashboard.getBoundingClientRect();
+    const visualScrollableWidth = Math.max(
+      rotatedDashboard.scrollHeight,
+      rect.width,
+      window.innerHeight
+    );
+
+    scrollSpacer.style.width = `${Math.ceil(visualScrollableWidth + 24)}px`;
+  });
 }
 
 async function updateStatus(key,status){
@@ -430,6 +486,7 @@ function renderTable(list){
 
   html += "</tbody></table>";
   tableWrap.innerHTML = html;
+  syncRotatedLayout();
 }
 
 async function fetchBookings(){
@@ -447,8 +504,28 @@ async function fetchBookings(){
   renderTable(bookings);
 }
 
+
+function enableRotatedWheelScroll(){
+  const scrollWrap = getScrollWrap();
+  if (!scrollWrap) return;
+
+  scrollWrap.addEventListener("wheel", (e) => {
+    if (drawingEnabled) return;
+
+    const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    if (!delta) return;
+
+    e.preventDefault();
+    scrollWrap.scrollLeft += delta;
+  }, { passive:false });
+}
+
+enableRotatedWheelScroll();
+window.addEventListener("resize", syncRotatedLayout);
+
 setInterval(fetchBookings,5000);
 fetchBookings();
+syncRotatedLayout();
 </script>
 
 </body>
