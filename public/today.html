@@ -85,13 +85,17 @@
     function updateClock(){clockEl.textContent=new Date().toLocaleString()}
     setInterval(updateClock,1000);updateClock();
 
-   function formatTime(dt) {
+function formatTime(dt) {
   if (!dt) return '';
   const d = new Date(dt);
-  return isNaN(d) ? dt : d.toLocaleTimeString('en-GB', {
+  if (isNaN(d)) return dt;
+  
+  // This forces the browser to display London time, 
+  // ignoring if the server (Render) or the local PC is on UTC.
+  return d.toLocaleTimeString('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false
+    timeZone: 'Europe/London'
   });
 }
 

@@ -1,4 +1,3 @@
-// server.js - Full Replacement
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
@@ -30,10 +29,7 @@ async function readJson(file, fallback = {}) {
     return fallback;
   }
 }
-async function writeJson(file, obj) {
-  await fs.writeFile(file, JSON.stringify(obj, null, 2));
-}
-
+async function writeJson(file, obj) { await fs.writeFile(file, JSON.stringify(obj, null, 2)); }
 async function readStatuses() { return readJson(STATUS_FILE, {}); }
 async function readReadyIn() { return readJson(READYIN_FILE, {}); }
 async function readLists() { return readJson(LISTS_FILE, { video: [], sound: [], lighting: [], grip: [] }); }
@@ -50,19 +46,26 @@ async function getJwt() {
   return token;
 }
 
-// Fixed Date Helpers to handle local day boundaries correctly
-function isSameDay(dateStr, targetDate) {
-  const d = new Date(dateStr);
-  return d.getFullYear() === targetDate.getFullYear() &&
-         d.getMonth() === targetDate.getMonth() &&
-         d.getDate() === targetDate.getDate();
+/* FIX: LONDON TIME HELPERS */
+function getLondonDay(offsetDays = 0) {
+  const now = new Date();
+  const londonStr = now.toLocaleDateString('en-GB', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-');
+  const d = new Date(londonStr + 'T00:00:00Z'); 
+  d.setUTCDate(d.getUTCDate() + offsetDays);
+  return d;
 }
 
-function getTimeBucket(dt) {
+function isSameLondonDate(dateStr, targetLondonDate) {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  const dStr = d.toLocaleDateString('en-GB', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-');
+  const targetStr = targetLondonDate.toISOString().split('T')[0];
+  return dStr === targetStr;
+}
+
+function getTimeBucket(dt, minutes = 5) {
   const d = new Date(dt);
-  // Round to nearest 5 mins in local time to prevent DST offsets from splitting groups
-  const coeff = 1000 * 60 * 5;
-  return new Date(Math.round(d.getTime() / coeff) * coeff).toISOString();
+  return new Date(Math.floor(d.getTime() / (minutes * 60000)) * (minutes * 60000)).toISOString();
 }
 
 function makeGroupKey(user, start) { return `${user}_${start}`; }
@@ -77,28 +80,20 @@ function categoryFromLists(name, lists) {
   return "uncategorised";
 }
 
-app.get(["/", "/index.html", "/home"], (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
-app.get(["/today", "/today.html"], (req, res) => res.sendFile(path.join(__dirname, "public", "today.html")));
-app.get("/teachers", (req, res) => res.sendFile(path.join(__dirname, "public", "teachers.html")));
-app.get(["/calendar", "/calendar.html"], (req, res) => res.sendFile(path.join(__dirname, "public", "calendar.html")));
-
-const TECH_PATH = "/tech-94f02c77b8c149e8bb3b0f72d8f93fa2";
-app.get(['/tech', '/tech.html'], (req, res) => res.redirect(302, TECH_PATH));
-app.get(TECH_PATH, (req, res) => res.sendFile(path.join(__dirname, "public", "tech.html")));
+app.get(["/today", "/today.html"], (req, res) => { res.sendFile(path.join(__dirname, "public", "today.html")); });
+app.get( "/tech-94f02c77b8c149e8bb3b0f72d8f93fa2", (req, res) => { res.sendFile(path.join(__dirname, "public", "tech.html")); });
 
 app.get("/api/bookings", async (req, res) => {
   try {
     const jwt = await getJwt();
-    const today = new Date();
+    const todayLondon = getLondonDay(0);
     const { data } = await axios.get(`${BASE_URL}/scripts/api/v1/listbookings`, {
       headers: { Accept: "application/json", Authorization: `Bearer ${jwt}` },
       params: { limit: 2000, _: Date.now() }
     });
-    let rows = (data?.response || []).filter(r => 
-        isSameDay(r.startdatetime, today) && 
-        !String(r.currentstatus).toLowerCase().includes("booking request")
-    );
-    res.json({ success: true, bookings: await expandBookings(rows) });
+    let rows = (data?.response || []).filter(r => isSameLondonDate(r.startdatetime, todayLondon) && !String(r.currentstatus).toLowerCase().includes("booking request"));
+    let expanded = await expandBookings(rows);
+    res.json({ success: true, bookings: expanded.filter(b => !(b.statuses?.every(st => st.includes("collected")))) });
   } catch (e) { res.json({ success: false, error: e.message }); }
 });
 
@@ -106,18 +101,14 @@ app.get("/api/bookings-tech", async (req, res) => {
   try {
     const mode = req.query.day || "today";
     const jwt = await getJwt();
-    const target = new Date();
-    if (mode === "tomorrow") target.setDate(target.getDate() + 1);
-
+    const targetDate = mode === "today" ? getLondonDay(0) : getLondonDay(1);
     const { data } = await axios.get(`${BASE_URL}/scripts/api/v1/listbookings`, {
       headers: { Accept: "application/json", Authorization: `Bearer ${jwt}` },
       params: { limit: 2000, _: Date.now() }
     });
-    let rows = (data?.response || []).filter(r => 
-        isSameDay(r.startdatetime, target) && 
-        !String(r.currentstatus).toLowerCase().includes("booking request")
-    );
-    res.json({ success: true, bookings: await expandBookings(rows) });
+    let rows = (data?.response || []).filter(r => isSameLondonDate(r.startdatetime, targetDate) && !String(r.currentstatus).toLowerCase().includes("booking request"));
+    let expanded = await expandBookings(rows);
+    res.json({ success: true, bookings: expanded.filter(b => !(b.statuses?.every(st => st.includes("collected")))) });
   } catch (e) { res.json({ success: false, error: e.message }); }
 });
 
@@ -126,51 +117,30 @@ async function expandBookings(rows) {
   const statuses = await readStatuses();
   const readyIn = await readReadyIn();
   const grouped = {};
-
   for (const r of rows) {
-    const user = r.username?.trim() || "Unknown";
     const bucket = getTimeBucket(r.startdatetime);
-    const key = makeGroupKey(user, bucket);
-
+    const key = makeGroupKey(r.username, bucket);
     if (!grouped[key]) {
-      grouped[key] = {
-        username: user,
-        startdatetime: bucket,
-        assets: [],
-        statuses: []
-      };
+      grouped[key] = { username: r.username, startdatetime: bucket, assets: [], statuses: [] };
     }
     grouped[key].assets.push({ name: r.assetname, category: categoryFromLists(r.assetname, lists) });
     grouped[key].statuses.push(String(r.currentstatus).toLowerCase());
   }
-
   return Object.values(grouped).map(b => {
     let status = "Not Picked";
-    const lower = b.statuses;
-    const pickedWords = ["picked", "ready", "collected", "issued", "prepar"];
-    const picked = lower.filter(st => pickedWords.some(w => st.includes(w))).length;
-
-    if (picked === 0) status = "Not Picked";
-    else if (picked < lower.length) status = "Preparing";
-    else status = "Ready for Collection";
-
-    if (statuses[b._groupKey]) {
-      const o = statuses[b._groupKey].toLowerCase();
-      if (o === "preparing") status = "Preparing";
-      if (o === "ready") status = "Ready for Collection";
-      if (o === "notpicked") status = "Not Picked";
-    }
-
-    return { ...b, status, readyInMinutes: readyIn[b._groupKey] || 0, _groupKey: b.username + "_" + b.startdatetime };
+    const picked = b.statuses.filter(st => ["picked", "ready", "collected", "issued", "prepar"].some(w => st.includes(w))).length;
+    if (picked > 0) status = picked < b.statuses.length ? "Preparing" : "Ready for Collection";
+    const key = makeGroupKey(b.username, b.startdatetime);
+    if (statuses[key]) status = statuses[key] === "ready" ? "Ready for Collection" : (statuses[key] === "preparing" ? "Preparing" : "Not Picked");
+    return { ...b, status, readyInMinutes: readyIn[key] || 0, _groupKey: key };
   });
 }
 
 app.post("/api/update-status", async (req, res) => {
   const { key, status } = req.body;
-  const statuses = await readStatuses();
-  if (status === "clear") delete statuses[key];
-  else statuses[key] = status.toLowerCase();
-  await writeJson(STATUS_FILE, statuses);
+  const s = await readStatuses();
+  if (status === "clear") delete s[key]; else s[key] = status.toLowerCase();
+  await writeJson(STATUS_FILE, s);
   res.json({ success: true });
 });
 
@@ -182,5 +152,4 @@ app.post("/api/ready-in", async (req, res) => {
   res.json({ success: true });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(process.env.PORT || 3000);

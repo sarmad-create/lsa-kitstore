@@ -382,13 +382,16 @@ function statusClass(status){
 }
 
 function formatTime(dt) {
-  if (!dt) return "";
+  if (!dt) return '';
   const d = new Date(dt);
-  // This forces the display to the local time of the browser
-  return isNaN(d) ? "" : d.toLocaleTimeString("en-GB", {
+  if (isNaN(d)) return dt;
+  
+  // This forces the browser to display London time, 
+  // ignoring if the server (Render) or the local PC is on UTC.
+  return d.toLocaleTimeString('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false
+    timeZone: 'Europe/London'
   });
 }
 
