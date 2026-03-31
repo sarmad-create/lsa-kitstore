@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <title>Technician Dashboard</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="icon" href="/favicon.ico">
   <style>
     html, body { margin:0; padding:0; overflow:hidden; height:100%; width:100%; }
     #scrollWrap { position: relative; width: 100%; height: 100%; overflow-x: auto; overflow-y: hidden; touch-action: pan-x; overscroll-behavior-x: contain; }
@@ -37,65 +36,11 @@
     .readyin-chip{ font-size:12px; background:rgba(255,255,255,0.08); padding:4px 8px; border-radius:25px }
     .readyin-btn{ padding:6px 12px; border-radius:25px; background:#333; color:#fff; font-weight:700 }
     #clock { font-size:20px; font-weight:600; opacity:.9; }
-    #annotateCanvas{ position:fixed; top:0; left:0; width:100vw; height:100vh; background:transparent; z-index:999999; touch-action:none; }
-    .noclick { pointer-events:none !important; }
-    #annotateTools { position:fixed; top:10px; right:180px; z-index:1000000; pointer-events:none; }
-    #annotateToolsInner { transform: rotate(-90deg); transform-origin: top right; display:flex; flex-direction:column; gap:8px; pointer-events:auto; }
-    .tool-btn{ background:rgba(255,255,255,0.35); border-radius:24px; padding:8px 16px; font-weight:700; border:1px solid rgba(255,255,255,0.4); font-size:14px; color:black; cursor:pointer; backdrop-filter: blur(4px); }
   </style>
 </head>
 <body>
-
-<canvas id="annotateCanvas"></canvas>
-<div id="annotateTools">
-  <div id="annotateToolsInner">
-    <button class="tool-btn" onclick="toggleAnnotate()" id="toggleDrawBtn">DRAW OFF</button>
-    <button class="tool-btn" onclick="undoStroke()">Undo</button>
-    <button class="tool-btn" onclick="clearCanvas()">Clear</button>
-    <button class="tool-btn" onclick="enableEraser()">Eraser</button>
-  </div>
-</div>
-
-<script>
-const canvas = document.getElementById("annotateCanvas");
-const ctx = canvas.getContext("2d");
-function getScrollWrap(){ return document.getElementById("scrollWrap"); }
-function getScrollSpacer(){ return document.getElementById("scrollSpacer"); }
-function getRotatedDashboard(){ return document.getElementById("rotatedDashboard"); }
-let drawing = false; let erasing = false; let drawingEnabled = false;
-const strokeColor = "white"; const strokeWidth = 5;
-const undoStack = [];
-function resizeCanvas(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-resizeCanvas(); window.addEventListener("resize", resizeCanvas);
-function saveState() { undoStack.push(canvas.toDataURL()); if (undoStack.length > 40) undoStack.shift(); }
-function undoStroke() {
-  if (!undoStack.length) return;
-  const img = new Image(); img.src = undoStack.pop();
-  img.onload = () => { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img,0,0); };
-}
-function enableEraser(){ erasing = true; ctx.globalCompositeOperation = "destination-out"; }
-function clearCanvas(){ ctx.clearRect(0,0,canvas.width,canvas.height); undoStack.length = 0; }
-function toggleAnnotate(){
-  drawingEnabled = !drawingEnabled;
-  if (drawingEnabled){
-    canvas.classList.remove("noclick"); toggleDrawBtn.textContent = "DRAW ON"; toggleDrawBtn.style.background = "#5cff89";
-    const scrollWrap = getScrollWrap(); if (scrollWrap) scrollWrap.style.overflow = "hidden";
-    canvas.style.touchAction = "none";
-  } else {
-    canvas.classList.add("noclick"); toggleDrawBtn.textContent = "DRAW OFF"; toggleDrawBtn.style.background = "rgba(255,255,255,0.35)";
-    const scrollWrap = getScrollWrap(); if (scrollWrap) { scrollWrap.style.overflowX = "auto"; scrollWrap.style.overflowY = "hidden"; }
-    canvas.style.touchAction = "auto";
-  }
-}
-canvas.classList.add("noclick");
-canvas.addEventListener("pointerdown", e => { if (!drawingEnabled) return; saveState(); drawing = true; ctx.beginPath(); ctx.moveTo(e.clientX, e.clientY); ctx.globalCompositeOperation = erasing ? "destination-out" : "source-over"; });
-canvas.addEventListener("pointermove", e => { if (!drawingEnabled || !drawing) return; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = erasing ? 24 : strokeWidth; ctx.strokeStyle = strokeColor; ctx.lineTo(e.clientX, e.clientY); ctx.stroke(); });
-canvas.addEventListener("pointerup", ()=>{ drawing = false; erasing = false; });
-canvas.addEventListener("pointercancel", ()=>{ drawing = false; erasing = false; });
-</script>
-
 <div id="scrollWrap">
-  <div id="scrollSpacer" aria-hidden="true"></div>
+  <div id="scrollSpacer"></div>
   <div class="rotate-90-ccw" id="rotatedDashboard">
     <header>
       <h1>Technician Dashboard</h1>
@@ -106,22 +51,12 @@ canvas.addEventListener("pointercancel", ()=>{ drawing = false; erasing = false;
       <div id="clock">Loading...</div>
     </header>
     <main style="padding:16px">
-      <div class="legend">
-        <span class="asset-pill asset-video">Video</span>
-        <span class="asset-pill asset-sound">Sound</span>
-        <span class="asset-pill asset-lighting">Lighting</span>
-        <span class="asset-pill asset-grip">Grip</span>
-        <span class="asset-pill asset-uncategorised">Uncategorised</span>
-      </div>
       <div id="tableWrap"></div>
     </main>
   </div>
 </div>
-
 <script>
 let bookings = []; let dayMode = "today";
-const btnToday = document.getElementById("btnToday");
-const btnTomorrow = document.getElementById("btnTomorrow");
 const tableWrap = document.getElementById("tableWrap");
 const clockEl = document.getElementById("clock");
 
@@ -130,77 +65,53 @@ function updateClock(){
 }
 setInterval(updateClock,1000); updateClock();
 
-function switchDay(mode){ dayMode = mode; btnToday.classList.toggle("selected", mode==="today"); btnTomorrow.classList.toggle("selected", mode==="tomorrow"); fetchBookings(); }
-function statusClass(status){ status = status.toLowerCase(); if (status.includes("ready")) return "ready"; if (status.includes("prepar")) return "preparing"; if (status.includes("not")) return "notpicked"; return ""; }
+function switchDay(mode){
+  dayMode = mode;
+  document.getElementById("btnToday").classList.toggle("selected", mode==="today");
+  document.getElementById("btnTomorrow").classList.toggle("selected", mode==="tomorrow");
+  fetchBookings();
+}
 
-function formatTime(dt){
+function formatTime(dt) {
   if (!dt) return '';
-  const d = new Date(dt);
-  if (isNaN(d)) return dt;
-  // Use London timezone to prevent DST double-offsets
-  return d.toLocaleTimeString("en-GB", { hour:'2-digit', minute:'2-digit', hour12: false, timeZone: "Europe/London" });
-}
-
-function renderAssets(arr){
-  if (!Array.isArray(arr) || !arr.length) return "";
-  const counts = new Map();
-  for (const asset of arr){
-    const name = (asset && asset.name ? String(asset.name) : "").trim(); if (!name) continue;
-    const rawCategory = (asset && asset.category ? String(asset.category) : "uncategorised").toLowerCase();
-    const category = ["video","sound","lighting","grip","uncategorised"].includes(rawCategory) ? rawCategory : "uncategorised";
-    if (!counts.has(name)) counts.set(name, { count: 0, category });
-    counts.get(name).count += 1;
-  }
-  return Array.from(counts.entries()).map(([name, info]) => {
-    const label = info.count > 1 ? `${name} x${info.count}` : name;
-    return `<span class="asset-pill asset-${info.category}">${label}</span>`;
-  }).join("");
-}
-
-function syncRotatedLayout(){
-  requestAnimationFrame(() => {
-    const rotatedDashboard = getRotatedDashboard(); const scrollSpacer = getScrollSpacer();
-    if (!rotatedDashboard || !scrollSpacer) return;
-    const rect = rotatedDashboard.getBoundingClientRect();
-    const visualScrollableWidth = Math.max(rotatedDashboard.scrollHeight, rect.width, window.innerHeight);
-    scrollSpacer.style.width = `${Math.ceil(visualScrollableWidth + 24)}px`;
+  // Force Europe/London display to correct for BST offset shift
+  return new Date(dt).toLocaleTimeString("en-GB", {
+    timeZone: "Europe/London",
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
   });
 }
 
-async function updateStatus(key,status){ await fetch("/api/update-status", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ key, status }) }); fetchBookings(); }
-async function setReadyIn(key, minutes){ await fetch("/api/ready-in", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ key, minutes }) }); fetchBookings(); }
-
 function renderTable(list){
   let html = `<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th><th>Actions</th></tr></thead><tbody>`;
-  if (!list.length){ html += `<tr><td colspan="5">No bookings.</td></tr>`; } else {
-    for (const b of list){
-      html += `<tr><td>${formatTime(b.startdatetime)}</td><td>${b.username}</td><td><span class="status ${statusClass(b.status)}">${b.status}</span></td><td>${renderAssets(b.assets)}</td><td>
-          ${b.status==="Not Picked" ? `<button class="btn-preparing" onclick="updateStatus('${b._groupKey}','preparing')">Preparing</button>` : ""}
-          ${b.status==="Preparing" ? `<button class="btn-ready" onclick="updateStatus('${b._groupKey}','ready')">Ready</button>` : ""}
-          <button class="btn-clear" onclick="updateStatus('${b._groupKey}','clear')">Clear</button>
-          <div class="readyin-wrap"><span class="readyin-chip">Ready in <b>${b.readyInMinutes}</b> min</span>
-            <button class="readyin-btn" onclick="setReadyIn('${b._groupKey}', Math.max(0,${b.readyInMinutes}-5))">–5</button>
-            <button class="readyin-btn" onclick="setReadyIn('${b._groupKey}', ${b.readyInMinutes}+5)">+5</button>
-          </div></td></tr>`;
-    }
+  for (const b of list){
+    const sCls = b.status.toLowerCase().includes("ready") ? "ready" : b.status.toLowerCase().includes("prepar") ? "preparing" : "notpicked";
+    html += `<tr>
+      <td>${formatTime(b.startdatetime)}</td>
+      <td>${b.username}</td>
+      <td><span class="status ${sCls}">${b.status}</span></td>
+      <td>${(b.assets||[]).map(a=>`<span class="asset-pill asset-${a.category}">${a.name}</span>`).join("")}</td>
+      <td>
+        ${b.status==="Not Picked" ? `<button class="btn-preparing" onclick="updateStatus('${b._groupKey}','preparing')">Preparing</button>` : ""}
+        ${b.status==="Preparing" ? `<button class="btn-ready" onclick="updateStatus('${b._groupKey}','ready')">Ready</button>` : ""}
+        <button class="btn-clear" onclick="updateStatus('${b._groupKey}','clear')">Clear</button>
+      </td>
+    </tr>`;
   }
-  html += "</tbody></table>"; tableWrap.innerHTML = html; syncRotatedLayout();
+  html += "</tbody></table>"; tableWrap.innerHTML = html;
 }
 
 async function fetchBookings(){
-  const r = await fetch(`/api/bookings-tech?day=${dayMode}`); const data = await r.json();
-  let list = data.bookings || [];
-  list = list.filter(b => !(b.statuses && b.statuses.length > 0 && b.statuses.every(st => st.includes("collected"))));
-  list.sort((a,b)=> new Date(a.startdatetime) - new Date(b.startdatetime));
-  bookings = list; renderTable(bookings);
+  const r = await fetch(`/api/bookings-tech?day=${dayMode}`);
+  const data = await r.json();
+  renderTable(data.bookings || []);
 }
-
-function enableRotatedWheelScroll(){
-  const scrollWrap = getScrollWrap(); if (!scrollWrap) return;
-  scrollWrap.addEventListener("wheel", (e) => { if (drawingEnabled) return; const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX; if (!delta) return; e.preventDefault(); scrollWrap.scrollLeft += delta; }, { passive:false });
+async function updateStatus(key, status){
+  await fetch("/api/update-status", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({key,status}) });
+  fetchBookings();
 }
-enableRotatedWheelScroll(); window.addEventListener("resize", syncRotatedLayout);
-setInterval(fetchBookings,5000); fetchBookings(); syncRotatedLayout();
+setInterval(fetchBookings, 10000); fetchBookings();
 </script>
 </body>
 </html>

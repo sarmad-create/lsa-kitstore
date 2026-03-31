@@ -50,7 +50,6 @@ let cachedJwt = null, jwtExpiry = 0;
 
 async function getJwt() {
   if (cachedJwt && Date.now() < jwtExpiry - 3000) return cachedJwt;
-
   const res = await axios.post(`${BASE_URL}/scripts/api/v1/jwt_request`, {}, {
     headers: {
       Accept: 'application/json',
@@ -59,7 +58,6 @@ async function getJwt() {
       AuthKey: AUTH_KEY
     }
   });
-
   const token = res?.data?.token || res?.data?.response?.token;
   cachedJwt = token;
   jwtExpiry = Date.now() + 55_000;
@@ -67,7 +65,7 @@ async function getJwt() {
 }
 
 /* ============================================================
-   UTC DATE HELPERS
+   DATE HELPERS
 ============================================================ */
 
 function getUTCDateOnly(d) {
@@ -85,10 +83,11 @@ function isSameUTCDate(dateStr, utcDay) {
 ============================================================ */
 
 function getTimeBucket(dt, minutes = 5) {
+  // Use absolute time rounding to ensure the bucket key remains consistent across DST changes
   const d = new Date(dt);
   const ms = minutes * 60 * 1000;
-  // Use absolute time to avoid DST local rollover issues
-  return new Date(Math.floor(d.getTime() / ms) * ms).toISOString();
+  const rounded = Math.floor(d.getTime() / ms) * ms;
+  return new Date(rounded).toISOString();
 }
 
 function makeGroupKey(user, start) { return `${user}_${start}`; }
@@ -105,161 +104,53 @@ function categoryFromLists(name, lists) {
 }
 
 /* ============================================================
-   ROUTES — PAGES
+   ROUTES
 ============================================================ */
-
-app.get(["/", "/index.html", "/home"], (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-app.get(["/today", "/today.html"], (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "today.html"));
-});
-
-app.get("/teachers", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "teachers.html"));
-});
-
-app.get(["/calendar", "/calendar.html"], (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "calendar.html"));
-});
+app.get(["/", "/index.html", "/home"], (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
+app.get(["/today", "/today.html"], (req, res) => res.sendFile(path.join(__dirname, "public", "today.html")));
+app.get("/teachers", (req, res) => res.sendFile(path.join(__dirname, "public", "teachers.html")));
+app.get(["/calendar", "/calendar.html"], (req, res) => res.sendFile(path.join(__dirname, "public", "calendar.html")));
 
 const TECH_PATH = "/tech-94f02c77b8c149e8bb3b0f72d8f93fa2";
-
-app.get(['/tech', '/tech.html', '/public/tech.html'], (req, res) => {
-  res.redirect(302, TECH_PATH);
-});
-
-app.get(TECH_PATH, (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "tech.html"));
-});
+app.get(['/tech', '/tech.html', '/public/tech.html'], (req, res) => res.redirect(302, TECH_PATH));
+app.get(TECH_PATH, (req, res) => res.sendFile(path.join(__dirname, "public", "tech.html")));
 
 app.use('/', express.static(path.join(__dirname, 'public')));
 
 /* ============================================================
-   API: INDEX DASHBOARD — TODAY ONLY
+   APIs
 ============================================================ */
+
 app.get("/api/bookings", async (req, res) => {
   try {
     const jwt = await getJwt();
     const todayUTC = getUTCDateOnly(new Date());
-
     const { data } = await axios.get(`${BASE_URL}/scripts/api/v1/listbookings`, {
       headers: { Accept: "application/json", Authorization: `Bearer ${jwt}` },
       params: { limit: 2000, _: Date.now() }
     });
-
     let rows = data?.response || [];
-    rows = rows.filter(r =>
-      isSameUTCDate(r.startdatetime, todayUTC) &&
-      !String(r.currentstatus).toLowerCase().includes("booking request")
-    );
-
-    let expanded = await expandBookings(rows);
-    expanded = expanded.filter(b =>
-      !(b.statuses && b.statuses.length > 0 && b.statuses.every(st => st.includes("collected")))
-    );
-
-    res.json({ success: true, bookings: expanded });
-  } catch (e) {
-    res.json({ success: false, error: e.message });
-  }
+    rows = rows.filter(r => isSameUTCDate(r.startdatetime, todayUTC) && !String(r.currentstatus).toLowerCase().includes("booking request"));
+    res.json({ success: true, bookings: await expandBookings(rows) });
+  } catch (e) { res.json({ success: false, error: e.message }); }
 });
 
-/* ============================================================
-   API: TECH DASHBOARD — TODAY OR TOMORROW
-============================================================ */
 app.get("/api/bookings-tech", async (req, res) => {
   try {
     const mode = req.query.day || "today";
     const jwt = await getJwt();
-
     const todayUTC = getUTCDateOnly(new Date());
-    const tomorrowUTC = new Date(todayUTC);
-    tomorrowUTC.setUTCDate(todayUTC.getUTCDate() + 1);
+    const targetUTC = new Date(todayUTC);
+    if(mode === "tomorrow") targetUTC.setUTCDate(todayUTC.getUTCDate() + 1);
 
     const { data } = await axios.get(`${BASE_URL}/scripts/api/v1/listbookings`, {
       headers: { Accept: "application/json", Authorization: `Bearer ${jwt}` },
       params: { limit: 2000, _: Date.now() }
     });
-
-    let rows = data?.response || [];
-    rows = rows.filter(r => {
-      const isToday = isSameUTCDate(r.startdatetime, todayUTC);
-      const isTomorrow = isSameUTCDate(r.startdatetime, tomorrowUTC);
-      const notRequest = !String(r.currentstatus).toLowerCase().includes("booking request");
-      return (mode === "today" ? isToday : isTomorrow) && notRequest;
-    });
-
-    let expanded = await expandBookings(rows);
-    expanded = expanded.filter(b =>
-      !(b.statuses && b.statuses.length > 0 && b.statuses.every(st => st.includes("collected")))
-    );
-
-    res.json({ success: true, bookings: expanded });
-  } catch (e) {
-    res.json({ success: false, error: e.message });
-  }
-});
-
-/* ============================================================
-   API: TEACHERS DASHBOARD
-============================================================ */
-app.get("/api/bookings-all", async (req, res) => {
-  try {
-    const jwt = await getJwt();
-    const { data } = await axios.get(`${BASE_URL}/scripts/api/v1/listbookings`, {
-      headers: { Accept: "application/json", Authorization: `Bearer ${jwt}` },
-      params: { limit: 2000, _: Date.now() }
-    });
-
-    let rows = data?.response || [];
-    const ignore = ["returned", "complete", "completed", "cancel", "reject", "booking request"];
-    rows = rows.filter(r => !ignore.some(x => String(r.currentstatus).toLowerCase().includes(x)));
-
+    let rows = (data?.response || []).filter(r => isSameUTCDate(r.startdatetime, targetUTC) && !String(r.currentstatus).toLowerCase().includes("booking request"));
     res.json({ success: true, bookings: await expandBookings(rows) });
-  } catch (e) {
-    res.json({ success: false, error: e.message });
-  }
+  } catch (e) { res.json({ success: false, error: e.message }); }
 });
-
-/* ============================================================
-   API: BOOKINGS RANGE
-============================================================ */
-app.get("/api/bookings-range", async (req, res) => {
-  try {
-    const start = new Date(req.query.start);
-    const end = new Date(req.query.end);
-    if (isNaN(start) || isNaN(end)) return res.json({ success: false, error: "Invalid range" });
-
-    const jwt = await getJwt();
-    const { data } = await axios.get(`${BASE_URL}/scripts/api/v1/listbookings`, {
-      headers: { Accept: "application/json", Authorization: `Bearer ${jwt}` },
-      params: { limit: 2000, _: Date.now() }
-    });
-
-    let rows = data?.response || [];
-    rows = rows.filter(r => {
-      const sd = new Date(r.startdatetime);
-      const notRequest = !String(r.currentstatus).toLowerCase().includes("booking request");
-      return notRequest && !isNaN(sd) && sd >= start && sd < end;
-    });
-
-    let expanded = await expandBookings(rows);
-    expanded = expanded.filter(b =>
-      !(b.statuses && b.statuses.length > 0 && b.statuses.every(st => st.includes("collected")))
-    );
-
-    res.json({ success: true, bookings: expanded });
-  } catch (e) {
-    res.json({ success: false, error: e.message });
-  }
-});
-
-/* ============================================================
-   EXPAND BOOKINGS
-============================================================ */
-function pickEndDatetime(r) { return r.enddatetime || r.endDateTime || r.end_time || r.end || null; }
 
 async function expandBookings(rows) {
   const lists = await readLists();
@@ -271,36 +162,15 @@ async function expandBookings(rows) {
     const user = r.username?.trim() || "Unknown";
     const bucket = getTimeBucket(r.startdatetime);
     const key = makeGroupKey(user, bucket);
-    const rawStart = r.startdatetime;
-    const rawEnd = pickEndDatetime(r);
 
     if (!grouped[key]) {
       grouped[key] = {
         username: user,
-        originalStart: rawStart || null,
-        originalEnd: rawEnd || null,
         startdatetime: bucket,
-        enddatetime: rawEnd || null,
         assets: [],
         statuses: []
       };
-    } else {
-      if (rawStart) {
-        const prev = grouped[key].originalStart ? new Date(grouped[key].originalStart) : null;
-        const cur = new Date(rawStart);
-        if (!prev || (!isNaN(cur) && cur < prev)) grouped[key].originalStart = rawStart;
-      }
     }
-
-    if (rawEnd) {
-      const prevEnd = grouped[key].enddatetime ? new Date(grouped[key].enddatetime) : null;
-      const curEnd = new Date(rawEnd);
-      if (!prevEnd || (!isNaN(curEnd) && curEnd > prevEnd)) {
-        grouped[key].enddatetime = rawEnd;
-        grouped[key].originalEnd = rawEnd;
-      }
-    }
-
     grouped[key].assets.push({ name: r.assetname, category: categoryFromLists(r.assetname, lists) });
     grouped[key].statuses.push(String(r.currentstatus).toLowerCase());
   }
@@ -315,15 +185,15 @@ async function expandBookings(rows) {
     else if (picked < lower.length) status = "Preparing";
     else status = "Ready for Collection";
 
-    const key = makeGroupKey(b.username, b.startdatetime);
-    if (statuses[key]) {
+    const key = b.startdatetime ? makeGroupKey(b.username, b.startdatetime) : null;
+    if (key && statuses[key]) {
       const o = statuses[key].toLowerCase();
       if (o === "preparing") status = "Preparing";
       if (o === "ready") status = "Ready for Collection";
       if (o === "notpicked") status = "Not Picked";
     }
 
-    return { ...b, status, readyInMinutes: readyIn[key] || 0, _groupKey: key };
+    return { ...b, status, readyInMinutes: (key ? readyIn[key] : 0) || 0, _groupKey: key };
   });
 }
 
@@ -345,4 +215,4 @@ app.post("/api/ready-in", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => { console.log(`Server running on http://localhost:${PORT}`); });
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

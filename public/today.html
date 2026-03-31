@@ -4,13 +4,11 @@
   <meta charset="utf-8" />
   <title>Siso Collections Dashboard</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="icon" href="/favicon.ico">
   <style>
     body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;background:#0b1320;color:#e6eef8}
     header{padding:16px;background:#071126;display:flex;justify-content:space-between;align-items:center}
     h1{margin:0;font-size:20px}
-    #pageInfo{font-size:14px;opacity:0.85}
-    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    table{width:100%;border-collapse:collapse}
     th,td{padding:12px;text-align:left;vertical-align:top}
     tr:not(:first-child){border-top:1px solid rgba(255,255,255,0.06)}
     .status{font-weight:600;padding:6px 12px;border-radius:8px;display:inline-block}
@@ -18,143 +16,54 @@
     .status.preparing{background:#6b4d1f;color:#fff8e0}
     .status.ready{background:#1e4f2d;color:#ffffff;animation:readyGlow 2.8s ease-in-out infinite alternate}
     @keyframes readyGlow{from{transform:scale(1);box-shadow:0 0 0 rgba(0,255,120,0)}to{transform:scale(1.03);box-shadow:0 0 20px rgba(0,255,120,0.4)}}
-    .ready-in-note{display:inline-block;margin-left:8px;font-size:12px;opacity:.9;background:rgba(255,255,255,0.08);padding:4px 8px;border-radius:6px}
     .asset-pill{display:inline-block;border-radius:8px;padding:6px 10px;margin:3px 4px 0 0;font-weight:600}
     .asset-video{background-color:rgba(128,0,128,0.25); color:#efe8ff}
     .asset-sound{background-color:rgba(200,50,50,0.25); color:#ffecec}
     .asset-lighting{background-color:rgba(255,235,59,0.45); color:#ffffff}
     .asset-grip{background-color:rgba(0,123,255,0.28); color:#eaf2ff}
     .asset-uncategorised{background-color:rgba(200,200,200,0.18); color:#e6eef8}
-    .legend{font-size:12px;opacity:.95;margin-bottom:8px}
-    #viewToggle{width:18px;height:18px;accent-color:#4da3ff}
-    th:nth-child(1), td:nth-child(1){width:90px}
-    th:nth-child(2), td:nth-child(2){width:220px}
-    th:nth-child(3), td:nth-child(3){width:170px}
-    th:nth-child(4), td:nth-child(4){width:auto;text-align:left}
-    td{overflow-wrap:anywhere;word-break:break-word}
-</style>
+  </style>
 </head>
 <body>
   <header>
-    <div>
-      <h1>Today's Collections</h1>
-      <div id="clock" style="opacity:.9;font-size:13px">Loading...</div>
-    </div>
-    <div style="display:flex;align-items:center;gap:12px">
-      <label for="viewToggle" style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none">
-        <span id="viewLabel">Auto Mode</span>
-        <input id="viewToggle" type="checkbox" aria-label="Auto Mode" />
-      </label>
-      <div id="pageInfo">Page 0 of 0</div>
-    </div>
+    <h1>Today's Collections</h1>
+    <div id="clock">Loading...</div>
   </header>
-
   <main style="padding:16px">
-    <div class="legend">
-      <span class="asset-pill asset-video">Video</span>
-      <span class="asset-pill asset-sound">Sound</span>
-      <span class="asset-pill asset-lighting">Lighting</span>
-      <span class="asset-pill asset-grip">Grip</span>
-      <span class="asset-pill asset-uncategorised">Uncategorised</span>
-    </div>
     <div id="tableWrap"></div>
   </main>
-
   <script>
-    function statusClass(status){
-      const t=(status||'').toLowerCase();
-      if (t.includes('ready')) return 'ready';
-      if (t.includes('prepar')) return 'preparing';
-      if (t.includes('not')) return 'notpicked';
-      return t.replace(/\s+/g,'');
-    }
-
-    let bookings=[],page=0;const pageSize=8;let rotateTimer=null;let singlePageMode=false;
-    const pageInfo=document.getElementById('pageInfo'),tableWrap=document.getElementById('tableWrap'),clockEl=document.getElementById('clock');
-    const viewToggle=document.getElementById('viewToggle'),viewLabel=document.getElementById('viewLabel');
-
-    function updateClock(){ clockEl.textContent=new Date().toLocaleString("en-GB", { timeZone: "Europe/London" }); }
+    function updateClock(){ document.getElementById("clock").textContent = new Date().toLocaleString("en-GB", { timeZone:"Europe/London" }); }
     setInterval(updateClock,1000); updateClock();
 
-    function formatTime(dt){
-      if(!dt) return '';
-      const d = new Date(dt);
-      if(isNaN(d)) return dt;
-      // Force Europe/London timezone for display
-      return d.toLocaleTimeString("en-GB", { hour:'2-digit', minute:'2-digit', hour12: false, timeZone: "Europe/London" });
-    }
-
-    function renderAssets(assets){
-      if(!assets || !assets.length) return '';
-      const counts = {}; const categories = {};
-      for(const a of assets){
-        const name = (typeof a==='string') ? a : (a.name||'');
-        const cat  = (typeof a==='object' && a.category) ? a.category : 'uncategorised';
-        if(!name) continue;
-        if(!counts[name]){ counts[name]=0; categories[name]=cat; }
-        counts[name]++;
-      }
-      return Object.keys(counts).map(name=>{
-        const cat = categories[name] || 'uncategorised';
-        const cls = ['video','sound','lighting','grip','uncategorised'].includes((cat||'').toLowerCase()) ? (cat||'uncategorised').toLowerCase() : 'uncategorised';
-        const label = counts[name] > 1 ? `${name} x${counts[name]}` : name;
-        return `<span class="asset-pill asset-${cls}">${label}</span>`;
-      }).join('');
-    }
-
-    function renderPage(){
-      const totalPages=Math.max(1,Math.ceil(bookings.length/pageSize));
-      if(page>=totalPages)page=0;
-      const start=page*pageSize;
-      const pageBookings=singlePageMode ? bookings : bookings.slice(start,start+pageSize);
-      pageInfo.textContent=singlePageMode ? `Showing all bookings — ${bookings.length} total` : `Page ${page+1} of ${totalPages} — ${bookings.length} total`;
-      let html = '<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th></tr></thead><tbody>';
-      if(!pageBookings.length){ html += '<tr><td colspan="4">No bookings for today.</td></tr>'; }else{
-        for(const b of pageBookings){
-          const time=formatTime(b.startdatetime); const cls=statusClass(b.status);
-          const readyNote = (b.status!=='Ready for Collection' && Number(b.readyInMinutes)>0) ? `<span class="ready-in-note">Ready in ${b.readyInMinutes} min</span>` : '';
-          html += `<tr><td>${time}</td><td>${b.username}</td><td><span class="status ${cls}">${b.status}</span>${readyNote}</td><td>${renderAssets(b.assets)}</td></tr>`;
-        }
-      }
-      html+='</tbody></table>'; tableWrap.innerHTML=html;
+    function formatTime(dt) {
+      if (!dt) return '';
+      return new Date(dt).toLocaleTimeString("en-GB", {
+        timeZone: "Europe/London",
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
     }
 
     async function fetchBookings(){
-      try{
-        const resp=await fetch('/api/bookings');
-        const data=await resp.json();
-        bookings=(data.success&&Array.isArray(data.bookings))?data.bookings:[];
-        bookings.sort((a,b)=>new Date(a.startdatetime)-new Date(b.startdatetime));
-        const totalPages = Math.max(1, Math.ceil(bookings.length / pageSize));
-        if (page >= totalPages) page = 0;
-        renderPage();
-        if (!singlePageMode && totalPages > 1) { ensureAutoRotate(); } else { stopAutoRotate(); }
-      }catch(e){console.error('Fetch bookings failed',e);}
+      const resp = await fetch('/api/bookings');
+      const data = await resp.json();
+      const list = data.bookings || [];
+      let html = '<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th></tr></thead><tbody>';
+      for(const b of list){
+        const sCls = b.status.toLowerCase().includes("ready") ? "ready" : b.status.toLowerCase().includes("prepar") ? "preparing" : "notpicked";
+        html += `<tr>
+          <td>${formatTime(b.startdatetime)}</td>
+          <td>${b.username}</td>
+          <td><span class="status ${sCls}">${b.status}</span></td>
+          <td>${(b.assets||[]).map(a=>`<span class="asset-pill asset-${a.category}">${a.name}</span>`).join("")}</td>
+        </tr>`;
+      }
+      html += '</tbody></table>';
+      document.getElementById('tableWrap').innerHTML = html;
     }
-
-    function updateViewMode(){
-      const totalPages=Math.max(1,Math.ceil(bookings.length/pageSize));
-      singlePageMode=!viewToggle.checked;
-      viewLabel.textContent='Auto Mode'; page=0; renderPage();
-      if(singlePageMode || totalPages<=1){ stopAutoRotate(); }else{ startAutoRotate(); }
-    }
-
-    function startAutoRotate(){
-      stopAutoRotate();
-      const totalPages=Math.max(1,Math.ceil(bookings.length/pageSize));
-      if(singlePageMode || totalPages<=1) return;
-      rotateTimer=setInterval(()=>{ page = (page + 1) % totalPages; renderPage(); },10000);
-    }
-    function ensureAutoRotate(){
-      const totalPages=Math.max(1,Math.ceil(bookings.length/pageSize));
-      if(singlePageMode || totalPages<=1){ stopAutoRotate(); return; }
-      if(!rotateTimer) startAutoRotate();
-    }
-    function stopAutoRotate(){if(rotateTimer){clearInterval(rotateTimer);rotateTimer=null}}
-
-    setInterval(fetchBookings,5000);
-    (async function(){await fetchBookings();updateViewMode()})();
-    viewToggle.addEventListener('change',updateViewMode);
+    setInterval(fetchBookings, 10000); fetchBookings();
   </script>
 </body>
 </html>
