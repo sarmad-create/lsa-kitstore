@@ -14,7 +14,7 @@
       height:100%; width:100%;
     }
 
-    /* Scroll wrapper */
+   /* Scroll wrapper */
     #scrollWrap {
       position: relative;
       width: 100%;
@@ -24,7 +24,17 @@
       -webkit-overflow-scrolling: touch;
       touch-action: pan-x;
       overscroll-behavior-x: contain;
+
+      /* --- HIDE SCROLLBAR START --- */
+      scrollbar-width: none;            /* Firefox */
+      -ms-overflow-style: none;         /* IE and Edge */
     }
+
+    /* Chrome, Safari and Opera */
+    #scrollWrap::-webkit-scrollbar {
+      display: none;
+    }
+    /* --- HIDE SCROLLBAR END --- */
 
 
 
