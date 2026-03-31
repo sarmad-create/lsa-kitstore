@@ -86,7 +86,9 @@ function isSameUTCDate(dateStr, utcDay) {
 
 function getTimeBucket(dt, minutes = 5) {
   const d = new Date(dt);
-  return new Date(Math.floor(d.getTime() / (minutes * 60000)) * (minutes * 60000)).toISOString();
+  const ms = minutes * 60 * 1000;
+  // Use absolute time to avoid DST local rollover issues
+  return new Date(Math.floor(d.getTime() / ms) * ms).toISOString();
 }
 
 function makeGroupKey(user, start) { return `${user}_${start}`; }
@@ -106,19 +108,10 @@ function categoryFromLists(name, lists) {
    ROUTES — PAGES
 ============================================================ */
 
-/**
- * ✅ NEW: Homepage hub at "/"
- * This assumes you will create a NEW public/index.html for the homepage.
- * (Your existing dashboard index.html should be renamed to public/today.html)
- */
 app.get(["/", "/index.html", "/home"], (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-/**
- * ✅ NEW: Today's dashboard moved to /today
- * This assumes your old index.html is now public/today.html
- */
 app.get(["/today", "/today.html"], (req, res) => {
   res.sendFile(path.join(__dirname, "public", "today.html"));
 });
@@ -127,12 +120,10 @@ app.get("/teachers", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "teachers.html"));
 });
 
-/* ✅ CALENDAR ROUTES (fixes "Cannot GET /calendar") */
 app.get(["/calendar", "/calendar.html"], (req, res) => {
   res.sendFile(path.join(__dirname, "public", "calendar.html"));
 });
 
-/* TECH DASHBOARD SECRET PATH */
 const TECH_PATH = "/tech-94f02c77b8c149e8bb3b0f72d8f93fa2";
 
 app.get(['/tech', '/tech.html', '/public/tech.html'], (req, res) => {
@@ -143,7 +134,6 @@ app.get(TECH_PATH, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "tech.html"));
 });
 
-/* PUBLIC STATIC FILES */
 app.use('/', express.static(path.join(__dirname, 'public')));
 
 /* ============================================================
@@ -160,17 +150,12 @@ app.get("/api/bookings", async (req, res) => {
     });
 
     let rows = data?.response || [];
-
-    // Filter: today only, ignore request bookings
     rows = rows.filter(r =>
       isSameUTCDate(r.startdatetime, todayUTC) &&
       !String(r.currentstatus).toLowerCase().includes("booking request")
     );
 
-    // Expand
     let expanded = await expandBookings(rows);
-
-    // Hide truly collected bookings
     expanded = expanded.filter(b =>
       !(b.statuses && b.statuses.length > 0 && b.statuses.every(st => st.includes("collected")))
     );
@@ -199,7 +184,6 @@ app.get("/api/bookings-tech", async (req, res) => {
     });
 
     let rows = data?.response || [];
-
     rows = rows.filter(r => {
       const isToday = isSameUTCDate(r.startdatetime, todayUTC);
       const isTomorrow = isSameUTCDate(r.startdatetime, tomorrowUTC);
@@ -208,8 +192,6 @@ app.get("/api/bookings-tech", async (req, res) => {
     });
 
     let expanded = await expandBookings(rows);
-
-    // Hide truly collected bookings
     expanded = expanded.filter(b =>
       !(b.statuses && b.statuses.length > 0 && b.statuses.every(st => st.includes("collected")))
     );
@@ -221,12 +203,11 @@ app.get("/api/bookings-tech", async (req, res) => {
 });
 
 /* ============================================================
-   API: TEACHERS DASHBOARD — ALL ACTIVE
+   API: TEACHERS DASHBOARD
 ============================================================ */
 app.get("/api/bookings-all", async (req, res) => {
   try {
     const jwt = await getJwt();
-
     const { data } = await axios.get(`${BASE_URL}/scripts/api/v1/listbookings`, {
       headers: { Accept: "application/json", Authorization: `Bearer ${jwt}` },
       params: { limit: 2000, _: Date.now() }
@@ -234,10 +215,7 @@ app.get("/api/bookings-all", async (req, res) => {
 
     let rows = data?.response || [];
     const ignore = ["returned", "complete", "completed", "cancel", "reject", "booking request"];
-
-    rows = rows.filter(r =>
-      !ignore.some(x => String(r.currentstatus).toLowerCase().includes(x))
-    );
+    rows = rows.filter(r => !ignore.some(x => String(r.currentstatus).toLowerCase().includes(x)));
 
     res.json({ success: true, bookings: await expandBookings(rows) });
   } catch (e) {
@@ -246,26 +224,21 @@ app.get("/api/bookings-all", async (req, res) => {
 });
 
 /* ============================================================
-   API: BOOKINGS RANGE (used by calendar.html)
+   API: BOOKINGS RANGE
 ============================================================ */
 app.get("/api/bookings-range", async (req, res) => {
   try {
     const start = new Date(req.query.start);
     const end = new Date(req.query.end);
-    if (isNaN(start) || isNaN(end)) {
-      return res.json({ success: false, error: "Invalid start/end" });
-    }
+    if (isNaN(start) || isNaN(end)) return res.json({ success: false, error: "Invalid range" });
 
     const jwt = await getJwt();
-
     const { data } = await axios.get(`${BASE_URL}/scripts/api/v1/listbookings`, {
       headers: { Accept: "application/json", Authorization: `Bearer ${jwt}` },
       params: { limit: 2000, _: Date.now() }
     });
 
     let rows = data?.response || [];
-
-    // Filter: start <= booking start < end, ignore request bookings
     rows = rows.filter(r => {
       const sd = new Date(r.startdatetime);
       const notRequest = !String(r.currentstatus).toLowerCase().includes("booking request");
@@ -273,8 +246,6 @@ app.get("/api/bookings-range", async (req, res) => {
     });
 
     let expanded = await expandBookings(rows);
-
-    // Hide truly collected bookings
     expanded = expanded.filter(b =>
       !(b.statuses && b.statuses.length > 0 && b.statuses.every(st => st.includes("collected")))
     );
@@ -286,26 +257,20 @@ app.get("/api/bookings-range", async (req, res) => {
 });
 
 /* ============================================================
-   EXPAND BOOKINGS (INCLUDES enddatetime)
+   EXPAND BOOKINGS
 ============================================================ */
-
-function pickEndDatetime(r) {
-  // Try common shapes from APIs
-  return r.enddatetime || r.endDateTime || r.end_time || r.end || null;
-}
+function pickEndDatetime(r) { return r.enddatetime || r.endDateTime || r.end_time || r.end || null; }
 
 async function expandBookings(rows) {
   const lists = await readLists();
   const statuses = await readStatuses();
   const readyIn = await readReadyIn();
-
   const grouped = {};
 
   for (const r of rows) {
     const user = r.username?.trim() || "Unknown";
     const bucket = getTimeBucket(r.startdatetime);
     const key = makeGroupKey(user, bucket);
-
     const rawStart = r.startdatetime;
     const rawEnd = pickEndDatetime(r);
 
@@ -336,18 +301,13 @@ async function expandBookings(rows) {
       }
     }
 
-    grouped[key].assets.push({
-      name: r.assetname,
-      category: categoryFromLists(r.assetname, lists)
-    });
-
+    grouped[key].assets.push({ name: r.assetname, category: categoryFromLists(r.assetname, lists) });
     grouped[key].statuses.push(String(r.currentstatus).toLowerCase());
   }
 
   return Object.values(grouped).map(b => {
     let status = "Not Picked";
     const lower = b.statuses;
-
     const pickedWords = ["picked", "ready", "collected", "issued", "prepar"];
     const picked = lower.filter(st => pickedWords.some(w => st.includes(w))).length;
 
@@ -356,7 +316,6 @@ async function expandBookings(rows) {
     else status = "Ready for Collection";
 
     const key = makeGroupKey(b.username, b.startdatetime);
-
     if (statuses[key]) {
       const o = statuses[key].toLowerCase();
       if (o === "preparing") status = "Preparing";
@@ -364,18 +323,10 @@ async function expandBookings(rows) {
       if (o === "notpicked") status = "Not Picked";
     }
 
-    return {
-      ...b,
-      status,
-      readyInMinutes: readyIn[key] || 0,
-      _groupKey: key
-    };
+    return { ...b, status, readyInMinutes: readyIn[key] || 0, _groupKey: key };
   });
 }
 
-/* ============================================================
-   STATUS & READY IN
-============================================================ */
 app.post("/api/update-status", async (req, res) => {
   const { key, status } = req.body;
   const statuses = await readStatuses();
@@ -393,10 +344,5 @@ app.post("/api/ready-in", async (req, res) => {
   res.json({ success: true });
 });
 
-/* ============================================================
-   START SERVER
-============================================================ */
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+app.listen(PORT, () => { console.log(`Server running on http://localhost:${PORT}`); });
