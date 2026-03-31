@@ -11,7 +11,11 @@ app.disable('x-powered-by');
 app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+
+/* 1. SERVE STATIC FILES FIRST */
+// This ensures that files in /public are accessible and helps 
+// prevent "Cannot GET" errors when routes and files overlap.
+app.use(express.static(path.join(__dirname, 'public')));
 
 /* ===== ENV ===== */
 const BASE_URL = process.env.SISO_BASE_URL || 'https://lsa.siso.co';
@@ -103,31 +107,21 @@ function categoryFromLists(name, lists) {
 }
 
 /* ============================================================
-   ROUTES — PAGES
+   ROUTES — PAGES (FIXED)
 ============================================================ */
 
-/**
- * ✅ NEW: Homepage hub at "/"
- * This assumes you will create a NEW public/index.html for the homepage.
- * (Your existing dashboard index.html should be renamed to public/today.html)
- */
 app.get(["/", "/index.html", "/home"], (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-/**
- * ✅ NEW: Today's dashboard moved to /today
- * This assumes your old index.html is now public/today.html
- */
 app.get(["/today", "/today.html"], (req, res) => {
   res.sendFile(path.join(__dirname, "public", "today.html"));
 });
 
-app.get("/teachers", (req, res) => {
+app.get(["/teachers", "/teachers.html"], (req, res) => {
   res.sendFile(path.join(__dirname, "public", "teachers.html"));
 });
 
-/* ✅ CALENDAR ROUTES (fixes "Cannot GET /calendar") */
 app.get(["/calendar", "/calendar.html"], (req, res) => {
   res.sendFile(path.join(__dirname, "public", "calendar.html"));
 });
@@ -135,16 +129,13 @@ app.get(["/calendar", "/calendar.html"], (req, res) => {
 /* TECH DASHBOARD SECRET PATH */
 const TECH_PATH = "/tech-94f02c77b8c149e8bb3b0f72d8f93fa2";
 
-app.get(['/tech', '/tech.html', '/public/tech.html'], (req, res) => {
+app.get(['/tech', '/tech.html'], (req, res) => {
   res.redirect(302, TECH_PATH);
 });
 
 app.get(TECH_PATH, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "tech.html"));
 });
-
-/* PUBLIC STATIC FILES */
-app.use('/', express.static(path.join(__dirname, 'public')));
 
 /* ============================================================
    API: INDEX DASHBOARD — TODAY ONLY
@@ -161,16 +152,13 @@ app.get("/api/bookings", async (req, res) => {
 
     let rows = data?.response || [];
 
-    // Filter: today only, ignore request bookings
     rows = rows.filter(r =>
       isSameUTCDate(r.startdatetime, todayUTC) &&
       !String(r.currentstatus).toLowerCase().includes("booking request")
     );
 
-    // Expand
     let expanded = await expandBookings(rows);
 
-    // Hide truly collected bookings
     expanded = expanded.filter(b =>
       !(b.statuses && b.statuses.length > 0 && b.statuses.every(st => st.includes("collected")))
     );
@@ -209,7 +197,6 @@ app.get("/api/bookings-tech", async (req, res) => {
 
     let expanded = await expandBookings(rows);
 
-    // Hide truly collected bookings
     expanded = expanded.filter(b =>
       !(b.statuses && b.statuses.length > 0 && b.statuses.every(st => st.includes("collected")))
     );
@@ -265,7 +252,6 @@ app.get("/api/bookings-range", async (req, res) => {
 
     let rows = data?.response || [];
 
-    // Filter: start <= booking start < end, ignore request bookings
     rows = rows.filter(r => {
       const sd = new Date(r.startdatetime);
       const notRequest = !String(r.currentstatus).toLowerCase().includes("booking request");
@@ -274,7 +260,6 @@ app.get("/api/bookings-range", async (req, res) => {
 
     let expanded = await expandBookings(rows);
 
-    // Hide truly collected bookings
     expanded = expanded.filter(b =>
       !(b.statuses && b.statuses.length > 0 && b.statuses.every(st => st.includes("collected")))
     );
@@ -286,11 +271,10 @@ app.get("/api/bookings-range", async (req, res) => {
 });
 
 /* ============================================================
-   EXPAND BOOKINGS (INCLUDES enddatetime)
+   EXPAND BOOKINGS
 ============================================================ */
 
 function pickEndDatetime(r) {
-  // Try common shapes from APIs
   return r.enddatetime || r.endDateTime || r.end_time || r.end || null;
 }
 
