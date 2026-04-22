@@ -4,198 +4,74 @@
   <meta charset="utf-8" />
   <title>Technician Dashboard</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-
-<link rel="icon" href="/favicon.ico">
+  <link rel="icon" href="/favicon.ico">
 
   <style>
-    html, body {
-      margin:0; padding:0;
-      overflow:hidden;
-      height:100%; width:100%;
-    }
-
-   /* Scroll wrapper */
+    html, body { margin:0; padding:0; overflow:hidden; height:100%; width:100%; }
     #scrollWrap {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      overflow-x: auto;
-      overflow-y: hidden;
-      -webkit-overflow-scrolling: touch;
-      touch-action: pan-x;
-      overscroll-behavior-x: contain;
-
-      /* --- HIDE SCROLLBAR START --- */
-      scrollbar-width: none;            /* Firefox */
-      -ms-overflow-style: none;         /* IE and Edge */
+      position: relative; width: 100%; height: 100%;
+      overflow-x: auto; overflow-y: hidden;
+      -webkit-overflow-scrolling: touch; touch-action: pan-x;
+      overscroll-behavior-x: contain; scrollbar-width: none; -ms-overflow-style: none;
     }
-
-    /* Chrome, Safari and Opera */
-    #scrollWrap::-webkit-scrollbar {
-      display: none;
-    }
-    /* --- HIDE SCROLLBAR END --- */
-
-
-
-    #scrollSpacer{
-      width:100vh;
-      height:1px;
-      opacity:0;
-      pointer-events:none;
-    }
-    /* Rotated dashboard */
+    #scrollWrap::-webkit-scrollbar { display: none; }
+    #scrollSpacer { width:100vh; height:1px; opacity:0; pointer-events:none; }
     .rotate-90-ccw {
-      position: absolute; /* changed from fixed */
-      top: 100%;
-      left: 0;
-      transform-origin: left top;
-      transform: rotate(-90deg);
-      width: 100vh;
-      height: 100vw;
-      pointer-events:auto;
+      position: absolute; top: 100%; left: 0;
+      transform-origin: left top; transform: rotate(-90deg);
+      width: 100vh; height: 100vw; pointer-events:auto;
     }
-
-    body{font-family:system-ui,Segoe UI,Roboto,Arial;background:#1a1024;color:#f0e6ff}
-    header{
-      padding:16px;
-      background:#2c1952;
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      flex-wrap:wrap;
-      gap:10px;
+    body { font-family:system-ui,Segoe UI,Roboto,Arial; background:#1a1024; color:#f0e6ff; }
+    header {
+      padding:16px; background:#2c1952;
+      display:flex; justify-content:space-between; align-items:center;
+      flex-wrap:wrap; gap:10px;
     }
-    h1{margin:0;font-size:20px}
-
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:12px;text-align:left;vertical-align:top}
-    tr:not(:first-child){border-top:1px solid rgba(255,255,255,0.08)}
-
-    .status{font-weight:600;padding:6px 12px;border-radius:8px;display:inline-block}
-    .status.notpicked{background:#6b1f1f;color:#ffecec}
-    .status.preparing{background:#6b4d1f;color:#fff8e0}
-    .status.ready{background:#1e4f2d;color:#ffffff;animation:readyGlow 2.8s ease-in-out infinite alternate}
-    @keyframes readyGlow{from{transform:scale(1);box-shadow:0 0 0 rgba(0,255,120,0)}to{transform:scale(1.03);box-shadow:0 0 20px rgba(0,255,120,0.4)}}
-
-    .asset-pill{
-      display:inline-block;
-      border-radius:8px;
-      padding:6px 10px;
-      margin:3px 4px 0 0;
-      font-weight:600;
-    }
-    .asset-video{background:rgba(128,0,128,0.25); color:#efe8ff}
-    .asset-sound{background:rgba(200,50,50,0.25); color:#ffecec}
-    .asset-lighting{background:rgba(255,235,59,0.45); color:#ffffff}
-    .asset-grip{background:rgba(0,123,255,0.28); color:#eaf2ff}
-    .asset-uncategorised{background:rgba(200,200,200,0.18); color:#f0f0f0}
-
-    .top-btn {
-      padding:10px 22px;
-      border-radius:30px;
-      border:2px solid white;
-      cursor:pointer;
-      font-weight:700;
-      background:white;
-      color:black;
-      font-size:16px;
-      transition:.15s;
-    }
-    .top-btn.selected {
-      background:#f1c232;
-      border-color:#f1c232;
-      color:black;
-      box-shadow:0 0 10px rgba(255,200,50,0.6);
-    }
-
-    button {
-      border-radius:20px !important;
-      padding:6px 12px;
-      border:0;
-      cursor:pointer;
-      font-weight:700;
-      font-size:14px;
-    }
-    .btn-preparing{background:#f1c232;color:#222}
-    .btn-ready{background:#1e4f2d;color:#fff}
-    .btn-clear{background:#777;color:#fff}
-
-    .readyin-wrap{
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      margin-top:6px
-    }
-    .readyin-chip{
-      font-size:12px;
-      background:rgba(255,255,255,0.08);
-      padding:4px 8px;
-      border-radius:25px
-    }
-    .readyin-btn{
-      padding:6px 12px;
-      border-radius:25px;
-      background:#333;
-      color:#fff;
-      font-weight:700
-    }
-
-    #clock {
-      font-size:20px;
-      font-weight:600;
-      opacity:.9;
-    }
-
-    /* Annotation layer */
-    #annotateCanvas{
-      position:fixed;
-      top:0; left:0;
-      width:100vw; height:100vh;
-      background:transparent;
-      z-index:999999;
-
-      /* IMPORTANT: this is overridden dynamically */
-      touch-action:none;
-    }
-
+    h1 { margin:0; font-size:20px; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:12px; text-align:left; vertical-align:top; }
+    tr:not(:first-child) { border-top:1px solid rgba(255,255,255,0.08); }
+    .status { font-weight:600; padding:6px 12px; border-radius:8px; display:inline-block; }
+    .status.notpicked { background:#6b1f1f; color:#ffecec; }
+    .status.preparing { background:#6b4d1f; color:#fff8e0; }
+    .status.ready { background:#1e4f2d; color:#ffffff; animation:readyGlow 2.8s ease-in-out infinite alternate; }
+    @keyframes readyGlow { from { transform:scale(1); box-shadow:0 0 0 rgba(0,255,120,0); } to { transform:scale(1.03); box-shadow:0 0 20px rgba(0,255,120,0.4); } }
+    .asset-pill { display:inline-block; border-radius:8px; padding:6px 10px; margin:3px 4px 0 0; font-weight:600; }
+    .asset-video { background:rgba(128,0,128,0.25); color:#efe8ff; }
+    .asset-sound { background:rgba(200,50,50,0.25); color:#ffecec; }
+    .asset-lighting { background:rgba(255,235,59,0.45); color:#ffffff; }
+    .asset-grip { background:rgba(0,123,255,0.28); color:#eaf2ff; }
+    .asset-uncategorised { background:rgba(200,200,200,0.18); color:#f0f0f0; }
+    .top-btn { padding:10px 22px; border-radius:30px; border:2px solid white; cursor:pointer; font-weight:700; background:white; color:black; font-size:16px; transition:.15s; }
+    .top-btn.selected { background:#f1c232; border-color:#f1c232; color:black; box-shadow:0 0 10px rgba(255,200,50,0.6); }
+    button { border-radius:20px !important; padding:6px 12px; border:0; cursor:pointer; font-weight:700; font-size:14px; }
+    .btn-preparing { background:#f1c232; color:#222; }
+    .btn-ready { background:#1e4f2d; color:#fff; }
+    .btn-clear { background:#777; color:#fff; }
+    .readyin-wrap { display:inline-flex; align-items:center; gap:6px; margin-top:6px; }
+    .readyin-chip { font-size:12px; background:rgba(255,255,255,0.08); padding:4px 8px; border-radius:25px; }
+    .readyin-btn { padding:6px 12px; border-radius:25px; background:#333; color:#fff; font-weight:700; }
+    #clock { font-size:20px; font-weight:600; opacity:.9; }
+    #annotateCanvas { position:fixed; top:0; left:0; width:100vw; height:100vh; background:transparent; z-index:999999; touch-action:none; }
     .noclick { pointer-events:none !important; }
+    #annotateTools { position:fixed; top:10px; right:180px; z-index:1000000; pointer-events:none; }
+    #annotateToolsInner { transform: rotate(-90deg); transform-origin: top right; display:flex; flex-direction:column; gap:8px; pointer-events:auto; }
+    .tool-btn { background:rgba(255,255,255,0.35); border-radius:24px; padding:8px 16px; font-weight:700; border:1px solid rgba(255,255,255,0.4); font-size:14px; color:black; cursor:pointer; backdrop-filter: blur(4px); }
 
-    #annotateTools {
-      position:fixed;
-      top:10px;
-      right:180px;
-      z-index:1000000;
-      pointer-events:none;
-    }
-    #annotateToolsInner {
-      transform: rotate(-90deg);
-      transform-origin: top right;
-      display:flex;
-      flex-direction:column;
-      gap:8px;
-      pointer-events:auto;
-    }
-
-    .tool-btn{
-      background:rgba(255,255,255,0.35);
-      border-radius:24px;
-      padding:8px 16px;
-      font-weight:700;
-      border:1px solid rgba(255,255,255,0.4);
-      font-size:14px;
-      color:black;
-      cursor:pointer;
-      backdrop-filter: blur(4px);
-    }
+    /* --- OVERVIEW TAB STYLES --- */
+    #weekSelectorWrap { display: none; align-items: center; gap: 10px; background: rgba(255,255,255,0.1); padding: 5px 15px; border-radius: 30px; }
+    #weekPicker { background: transparent; border: none; color: white; font-family: inherit; font-size: 16px; color-scheme: dark; cursor: pointer; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 10px; }
+    .calendar-day { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; min-height: 400px; }
+    .calendar-day.collected-day { border-color: #1e4f2d; background: rgba(30, 79, 45, 0.2); }
+    .day-header { font-size: 18px; font-weight: 800; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+    .day-booking-item { font-size: 13px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .collected-stamp { color: #5cff89; font-weight: 900; font-size: 10px; text-transform: uppercase; background: rgba(92, 255, 137, 0.15); padding: 2px 6px; border-radius: 4px; letter-spacing: 0.5px; }
   </style>
 </head>
 <body>
 
-<!-- Annotation Canvas -->
 <canvas id="annotateCanvas"></canvas>
-
-<!-- Toolbar -->
 <div id="annotateTools">
   <div id="annotateToolsInner">
     <button class="tool-btn" onclick="toggleAnnotate()" id="toggleDrawBtn">DRAW OFF</button>
@@ -205,183 +81,94 @@
   </div>
 </div>
 
-<script>
-/* ===========================
-      Annotation Logic
-=========================== */
+<div id="scrollWrap">
+  <div id="scrollSpacer" aria-hidden="true"></div>
+  <div class="rotate-90-ccw" id="rotatedDashboard">
+    <header>
+      <div style="display:flex; align-items:center; gap:20px;">
+        <h1>Technician Dashboard</h1>
+        <div style="display:flex; gap:12px;">
+          <button id="btnOverview" onclick="switchDay('overview')" class="top-btn">Overview</button>
+          <button id="btnToday" onclick="switchDay('today')" class="top-btn selected">Today</button>
+          <button id="btnTomorrow" onclick="switchDay('tomorrow')" class="top-btn">Tomorrow</button>
+        </div>
+      </div>
+      <div id="weekSelectorWrap">
+        <span style="font-size:13px; font-weight:800;">WEEK COMMENCING:</span>
+        <input type="date" id="weekPicker">
+      </div>
+      <div id="clock">Loading...</div>
+    </header>
 
+    <main style="padding:16px">
+      <div class="legend" id="legendBar">
+        <span class="asset-pill asset-video">Video</span>
+        <span class="asset-pill asset-sound">Sound</span>
+        <span class="asset-pill asset-lighting">Lighting</span>
+        <span class="asset-pill asset-grip">Grip</span>
+        <span class="asset-pill asset-uncategorised">Uncategorised</span>
+      </div>
+      <div id="tableWrap"></div>
+    </main>
+  </div>
+</div>
+
+<script>
+/* Annotation Logic remains as per original source */
 const canvas = document.getElementById("annotateCanvas");
 const ctx = canvas.getContext("2d");
+const toggleDrawBtn = document.getElementById("toggleDrawBtn");
 function getScrollWrap(){ return document.getElementById("scrollWrap"); }
 function getScrollSpacer(){ return document.getElementById("scrollSpacer"); }
 function getRotatedDashboard(){ return document.getElementById("rotatedDashboard"); }
-
-let drawing = false;
-let erasing = false;
-let drawingEnabled = false;
-
-const strokeColor = "white";
-const strokeWidth = 5;
-
+let drawing = false, erasing = false, drawingEnabled = false;
 const undoStack = [];
-
-function resizeCanvas(){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-resizeCanvas();
-window.addEventListener("resize", resizeCanvas);
-
-function saveState() {
-  undoStack.push(canvas.toDataURL());
-  if (undoStack.length > 40) undoStack.shift();
-}
-
-function undoStroke() {
-  if (!undoStack.length) return;
-  const img = new Image();
-  img.src = undoStack.pop();
-  img.onload = () => {
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.drawImage(img,0,0);
-  };
-}
-
-function enableEraser(){
-  erasing = true;
-  ctx.globalCompositeOperation = "destination-out";
-}
-
-function clearCanvas(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  undoStack.length = 0;
-}
-
-/* ===========================
-   CRITICAL FIX FOR SCROLLING
-=========================== */
+function resizeCanvas(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+resizeCanvas(); window.addEventListener("resize", resizeCanvas);
+function saveState() { undoStack.push(canvas.toDataURL()); if (undoStack.length > 40) undoStack.shift(); }
+function undoStroke() { if (!undoStack.length) return; const img = new Image(); img.src = undoStack.pop(); img.onload = () => { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img,0,0); }; }
+function enableEraser(){ erasing = true; ctx.globalCompositeOperation = "destination-out"; }
+function clearCanvas(){ ctx.clearRect(0,0,canvas.width,canvas.height); undoStack.length = 0; }
 function toggleAnnotate(){
   drawingEnabled = !drawingEnabled;
-
   if (drawingEnabled){
-    canvas.classList.remove("noclick");
-    toggleDrawBtn.textContent = "DRAW ON";
-    toggleDrawBtn.style.background = "#5cff89";
-
-    const scrollWrap = getScrollWrap();
-    if (scrollWrap) scrollWrap.style.overflow = "hidden";   // block scroll
-    canvas.style.touchAction = "none";      // allow drawing
-
+    canvas.classList.remove("noclick"); toggleDrawBtn.textContent = "DRAW ON"; toggleDrawBtn.style.background = "#5cff89";
+    getScrollWrap().style.overflow = "hidden"; canvas.style.touchAction = "none";
   } else {
-    canvas.classList.add("noclick");
-    toggleDrawBtn.textContent = "DRAW OFF";
-    toggleDrawBtn.style.background = "rgba(255,255,255,0.35)";
-
-    const scrollWrap = getScrollWrap();
-    if (scrollWrap) {
-      scrollWrap.style.overflowX = "auto";    // enable rotated-page scroll
-      scrollWrap.style.overflowY = "hidden";
-    }
-    canvas.style.touchAction = "auto";      // pass touch events through
+    canvas.classList.add("noclick"); toggleDrawBtn.textContent = "DRAW OFF"; toggleDrawBtn.style.background = "rgba(255,255,255,0.35)";
+    const sw = getScrollWrap(); sw.style.overflowX = "auto"; sw.style.overflowY = "hidden"; canvas.style.touchAction = "auto";
   }
 }
-/* ===========================
-   END FIX
-=========================== */
-
 canvas.classList.add("noclick");
+canvas.addEventListener("pointerdown", e => { if (!drawingEnabled) return; saveState(); drawing = true; ctx.beginPath(); ctx.moveTo(e.clientX, e.clientY); ctx.globalCompositeOperation = erasing ? "destination-out" : "source-over"; });
+canvas.addEventListener("pointermove", e => { if (!drawingEnabled || !drawing) return; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = erasing ? 24 : 5; ctx.strokeStyle = "white"; ctx.lineTo(e.clientX, e.clientY); ctx.stroke(); });
+canvas.addEventListener("pointerup", ()=>{ drawing = false; erasing = false; });
 
-canvas.addEventListener("pointerdown", e => {
-  if (!drawingEnabled) return;
-
-  saveState();
-  drawing = true;
-
-  ctx.beginPath();
-  ctx.moveTo(e.clientX, e.clientY);
-
-  ctx.globalCompositeOperation = erasing ? "destination-out" : "source-over";
-});
-
-canvas.addEventListener("pointermove", e => {
-  if (!drawingEnabled || !drawing) return;
-
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.lineWidth = erasing ? 24 : strokeWidth;
-  ctx.strokeStyle = strokeColor;
-
-  ctx.lineTo(e.clientX, e.clientY);
-  ctx.stroke();
-});
-
-canvas.addEventListener("pointerup", ()=>{
-  drawing = false;
-  erasing = false;
-});
-
-canvas.addEventListener("pointercancel", ()=>{
-  drawing = false;
-  erasing = false;
-});
-</script>
-
-
-<!-- Dashboard Section -->
-<div id="scrollWrap">
-  <div id="scrollSpacer" aria-hidden="true"></div>
-
-<div class="rotate-90-ccw" id="rotatedDashboard">
-  <header>
-    <h1>Technician Dashboard</h1>
-
-    <div style="display:flex; gap:12px;">
-      <button id="btnToday" onclick="switchDay('today')" class="top-btn selected">Today</button>
-      <button id="btnTomorrow" onclick="switchDay('tomorrow')" class="top-btn">Tomorrow</button>
-    </div>
-
-    <div id="clock">Loading...</div>
-  </header>
-
-  <main style="padding:16px">
-    <div class="legend">
-      <span class="asset-pill asset-video">Video</span>
-      <span class="asset-pill asset-sound">Sound</span>
-      <span class="asset-pill asset-lighting">Lighting</span>
-      <span class="asset-pill asset-grip">Grip</span>
-      <span class="asset-pill asset-uncategorised">Uncategorised</span>
-    </div>
-    <div id="tableWrap"></div>
-  </main>
-</div>
-
-</div>
-
-<script>
-/* Dashboard Logic (unchanged) */
-let bookings = [];
+/* Dashboard Logic */
 let dayMode = "today";
-
 const btnToday = document.getElementById("btnToday");
 const btnTomorrow = document.getElementById("btnTomorrow");
-
+const btnOverview = document.getElementById("btnOverview");
+const weekSelectorWrap = document.getElementById("weekSelectorWrap");
+const weekPicker = document.getElementById("weekPicker");
 const tableWrap = document.getElementById("tableWrap");
 const clockEl = document.getElementById("clock");
+const legendBar = document.getElementById("legendBar");
 
-function updateClock(){
-  clockEl.textContent = new Date().toLocaleString("en-GB", { timeZone:"Europe/London" });
+function getMonday(d) {
+  d = new Date(d); let day = d.getDay();
+  let diff = d.getDate() - day + (day == 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
 }
-setInterval(updateClock,1000);
-updateClock();
+weekPicker.valueAsDate = getMonday(new Date());
 
-function switchDay(mode){
-  dayMode = mode;
+// FIXED: Event listener for the date picker to ensure it triggers fetch
+weekPicker.addEventListener('change', () => {
+  if (dayMode === 'overview') fetchBookings();
+});
 
-  btnToday.classList.toggle("selected", mode==="today");
-  btnTomorrow.classList.toggle("selected", mode==="tomorrow");
-
-  fetchBookings();
-}
+function updateClock(){ clockEl.textContent = new Date().toLocaleString("en-GB", { timeZone:"Europe/London" }); }
+setInterval(updateClock, 1000); updateClock();
 
 function statusClass(status){
   status = status.toLowerCase();
@@ -392,160 +179,140 @@ function statusClass(status){
 }
 
 function formatTime(dt) {
-  if (!dt) return '';
   const d = new Date(dt);
-  if (isNaN(d)) return dt;
-  
-  // This forces the browser to display London time, 
-  // ignoring if the server (Render) or the local PC is on UTC.
-  return d.toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Europe/London'
-  });
+  return isNaN(d) ? dt : d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
 }
 
 function renderAssets(arr){
   if (!Array.isArray(arr) || !arr.length) return "";
-
   const counts = new Map();
-
   for (const asset of arr){
-    const name = (asset && asset.name ? String(asset.name) : "").trim();
-    if (!name) continue;
-
-    const rawCategory = (asset && asset.category ? String(asset.category) : "uncategorised").toLowerCase();
-    const category = ["video","sound","lighting","grip","uncategorised","uncategorized"].includes(rawCategory)
-      ? rawCategory
-      : "uncategorised";
-
-    if (!counts.has(name)){
-      counts.set(name, { count: 0, category });
-    }
-
+    const name = (asset?.name || "").trim(); if (!name) continue;
+    const cat = (asset?.category || "uncategorised").toLowerCase();
+    const category = ["video","sound","lighting","grip","uncategorised"].includes(cat) ? cat : "uncategorised";
+    if (!counts.has(name)) counts.set(name, { count: 0, category });
     counts.get(name).count += 1;
   }
-
-  return Array.from(counts.entries()).map(([name, info]) => {
-    const label = info.count > 1 ? `${name} x${info.count}` : name;
-    return `<span class="asset-pill asset-${info.category}">${label}</span>`;
-  }).join("");
+  return Array.from(counts.entries()).map(([name, info]) => `<span class="asset-pill asset-${info.category}">${info.count > 1 ? `${name} x${info.count}` : name}</span>`).join("");
 }
 
 function syncRotatedLayout(){
   requestAnimationFrame(() => {
-    const rotatedDashboard = getRotatedDashboard();
-    const scrollSpacer = getScrollSpacer();
-    if (!rotatedDashboard || !scrollSpacer) return;
-
-    const rect = rotatedDashboard.getBoundingClientRect();
-    const visualScrollableWidth = Math.max(
-      rotatedDashboard.scrollHeight,
-      rect.width,
-      window.innerHeight
-    );
-
-    scrollSpacer.style.width = `${Math.ceil(visualScrollableWidth + 24)}px`;
+    const rd = getRotatedDashboard(); const ss = getScrollSpacer();
+    if (!rd || !ss) return;
+    const rect = rd.getBoundingClientRect();
+    const width = Math.max(rd.scrollHeight, rect.width, window.innerHeight);
+    ss.style.width = `${Math.ceil(width + 50)}px`;
   });
 }
 
+function switchDay(mode){
+  dayMode = mode;
+  btnToday.classList.toggle("selected", mode==="today");
+  btnTomorrow.classList.toggle("selected", mode==="tomorrow");
+  btnOverview.classList.toggle("selected", mode==="overview");
+  weekSelectorWrap.style.display = (mode === "overview") ? "flex" : "none";
+  legendBar.style.display = (mode === "overview") ? "none" : "block";
+  tableWrap.innerHTML = ""; // Clear current view immediately
+  fetchBookings();
+}
+
 async function updateStatus(key,status){
-  await fetch("/api/update-status", {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify({ key, status })
-  });
+  await fetch("/api/update-status", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ key, status }) });
   fetchBookings();
 }
 
 async function setReadyIn(key, minutes){
-  await fetch("/api/ready-in", {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify({ key, minutes })
-  });
+  await fetch("/api/ready-in", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ key, minutes }) });
   fetchBookings();
 }
 
-function renderTable(list){
-  let html = `
-  <table>
-    <thead>
-      <tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th><th>Actions</th></tr>
-    </thead>
-    <tbody>
-  `;
-
-  if (!list.length){
-    html += `<tr><td colspan="5">No bookings.</td></tr>`;
-  } else {
-    for (const b of list){
-      html += `
-      <tr>
-        <td>${formatTime(b.startdatetime)}</td>
-        <td>${b.username}</td>
-        <td><span class="status ${statusClass(b.status)}">${b.status}</span></td>
-        <td>${renderAssets(b.assets)}</td>
-        <td>
-          ${b.status==="Not Picked"
-            ? `<button class="btn-preparing" onclick="updateStatus('${b._groupKey}','preparing')">Preparing</button>` : ""}
-          ${b.status==="Preparing"
-            ? `<button class="btn-ready" onclick="updateStatus('${b._groupKey}','ready')">Ready</button>` : ""}
-          <button class="btn-clear" onclick="updateStatus('${b._groupKey}','clear')">Clear</button>
-
-          <div class="readyin-wrap">
-            <span class="readyin-chip">Ready in <b>${b.readyInMinutes}</b> min</span>
-            <button class="readyin-btn" onclick="setReadyIn('${b._groupKey}', Math.max(0,${b.readyInMinutes}-5))">–5</button>
-            <button class="readyin-btn" onclick="setReadyIn('${b._groupKey}', ${b.readyInMinutes}+5)">+5</button>
-          </div>
-        </td>
-      </tr>`;
-    }
-  }
-
-  html += "</tbody></table>";
+function renderOverview(list) {
+  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+  let html = `<div class="calendar-grid">`;
+  days.forEach((dayName, idx) => {
+    const dayNumber = idx + 1;
+    const dayBookings = list.filter(b => new Date(b.startdatetime).getDay() === dayNumber);
+    const isAllCollected = dayBookings.length > 0 && dayBookings.every(b => 
+      b.statuses && b.statuses.every(st => st.toLowerCase().includes("collected"))
+    );
+    html += `
+      <div class="calendar-day ${isAllCollected ? 'collected-day' : ''}">
+        <div class="day-header"><span>${dayName}</span>${isAllCollected ? '<span class="collected-stamp">Collected</span>' : ''}</div>
+        <div class="day-body">
+          ${dayBookings.length === 0 ? '<div style="opacity:0.2; font-style:italic; margin-top:10px;">No bookings</div>' : 
+            dayBookings.map(b => `
+              <div class="day-booking-item">
+                <div style="font-weight:700; color:#f1c232;">${formatTime(b.startdatetime)}</div>
+                <div style="font-weight:600;">${b.username}</div>
+                <div style="font-size:11px; opacity:0.6;">Status: ${b.status}</div>
+              </div>
+            `).join('')}
+        </div>
+      </div>`;
+  });
+  html += `</div>`;
   tableWrap.innerHTML = html;
   syncRotatedLayout();
 }
 
-async function fetchBookings(){
-  const r = await fetch(`/api/bookings-tech?day=${dayMode}`);
-  const data = await r.json();
-  let list = data.bookings || [];
-
-  list = list.filter(b =>
-    !(b.statuses && b.statuses.length > 0 && b.statuses.every(st => st.includes("collected")))
-  );
-
-  list.sort((a,b)=> new Date(a.startdatetime) - new Date(b.startdatetime));
-
-  bookings = list;
-  renderTable(bookings);
+function renderTable(list){
+  let html = `<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th><th>Actions</th></tr></thead><tbody>`;
+  if (!list.length) html += `<tr><td colspan="5">No bookings.</td></tr>`;
+  else {
+    for (const b of list){
+      html += `<tr>
+        <td>${formatTime(b.startdatetime)}</td><td>${b.username}</td>
+        <td><span class="status ${statusClass(b.status)}">${b.status}</span></td>
+        <td>${renderAssets(b.assets)}</td>
+        <td>
+          ${b.status==="Not Picked" ? `<button class="btn-preparing" onclick="updateStatus('${b._groupKey}','preparing')">Preparing</button>` : ""}
+          ${b.status==="Preparing" ? `<button class="btn-ready" onclick="updateStatus('${b._groupKey}','ready')">Ready</button>` : ""}
+          <button class="btn-clear" onclick="updateStatus('${b._groupKey}','clear')">Clear</button>
+          <div class="readyin-wrap"><span class="readyin-chip">Ready in <b>${b.readyInMinutes}</b> min</span>
+          <button class="readyin-btn" onclick="setReadyIn('${b._groupKey}', Math.max(0,${b.readyInMinutes}-5))">–5</button>
+          <button class="readyin-btn" onclick="setReadyIn('${b._groupKey}', ${b.readyInMinutes}+5)">+5</button></div>
+        </td></tr>`;
+    }
+  }
+  html += "</tbody></table>"; tableWrap.innerHTML = html; syncRotatedLayout();
 }
 
+async function fetchBookings(){
+  // Construct URL. If overview, explicitly send the date from the picker.
+  let url = `/api/bookings-tech?day=${dayMode}`;
+  if (dayMode === "overview") {
+    url = `/api/bookings-tech?day=overview&start=${weekPicker.value}`;
+  }
+
+  try {
+    const r = await fetch(url);
+    const data = await r.json();
+    let list = data.bookings || [];
+    if (dayMode !== "overview") {
+      list = list.filter(b => !(b.statuses && b.statuses.every(st => st.includes("collected"))));
+      list.sort((a,b)=> new Date(a.startdatetime) - new Date(b.startdatetime));
+      renderTable(list);
+    } else {
+      renderOverview(list);
+    }
+  } catch (err) { console.error("Fetch failed", err); }
+}
 
 function enableRotatedWheelScroll(){
-  const scrollWrap = getScrollWrap();
-  if (!scrollWrap) return;
-
-  scrollWrap.addEventListener("wheel", (e) => {
+  getScrollWrap().addEventListener("wheel", (e) => {
     if (drawingEnabled) return;
-
     const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
     if (!delta) return;
-
-    e.preventDefault();
-    scrollWrap.scrollLeft += delta;
+    e.preventDefault(); getScrollWrap().scrollLeft += delta;
   }, { passive:false });
 }
 
 enableRotatedWheelScroll();
 window.addEventListener("resize", syncRotatedLayout);
-
-setInterval(fetchBookings,5000);
+setInterval(fetchBookings, 5000);
 fetchBookings();
 syncRotatedLayout();
 </script>
-
 </body>
 </html>
