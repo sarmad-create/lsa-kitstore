@@ -48,10 +48,12 @@
     .btn-preparing { background:#f1c232; color:#222; }
     .btn-ready { background:#1e4f2d; color:#fff; }
     .btn-clear { background:#777; color:#fff; }
-    .readyin-wrap { display:inline-flex; align-items:center; gap:6px; margin-top:6px; }
-    .readyin-chip { font-size:12px; background:rgba(255,255,255,0.08); padding:4px 8px; border-radius:25px; }
-    .readyin-btn { padding:6px 12px; border-radius:25px; background:#333; color:#fff; font-weight:700; }
-    #clock { font-size:20px; font-weight:600; opacity:.9; }
+    #clock { font-size:20px; font-weight:600; opacity:.9; display: flex; align-items: center; }
+    
+    /* --- STATS STYLES --- */
+    .count-badge { background: #f1c232; color: #000; padding: 2px 8px; border-radius: 12px; font-size: 14px; font-weight: 800; }
+    .weekly-stats { font-size: 16px; font-weight: 700; background: rgba(255,255,255,0.1); padding: 8px 15px; border-radius: 20px; margin-right: 15px; color: #f1c232; }
+
     #annotateCanvas { position:fixed; top:0; left:0; width:100vw; height:100vh; background:transparent; z-index:999999; touch-action:none; }
     .noclick { pointer-events:none !important; }
     #annotateTools { position:fixed; top:10px; right:180px; z-index:1000000; pointer-events:none; }
@@ -64,9 +66,9 @@
     .calendar-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 10px; }
     .calendar-day { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; min-height: 400px; }
     .calendar-day.collected-day { border-color: #1e4f2d; background: rgba(30, 79, 45, 0.2); }
-    .day-header { font-size: 18px; font-weight: 800; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+    .day-header { font-size: 16px; font-weight: 800; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; display: flex; flex-direction: column; }
     .day-booking-item { font-size: 13px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-    .collected-stamp { color: #5cff89; font-weight: 900; font-size: 10px; text-transform: uppercase; background: rgba(92, 255, 137, 0.15); padding: 2px 6px; border-radius: 4px; letter-spacing: 0.5px; }
+    .collected-stamp { color: #5cff89; font-weight: 900; font-size: 10px; text-transform: uppercase; background: rgba(92, 255, 137, 0.15); padding: 2px 6px; border-radius: 4px; letter-spacing: 0.5px; width: fit-content; margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -95,7 +97,7 @@
       </div>
       <div id="weekSelectorWrap">
         <span style="font-size:13px; font-weight:800;">WEEK COMMENCING:</span>
-        <input type="date" id="weekPicker">
+        <input type="date" id="weekPicker" onchange="fetchBookings()">
       </div>
       <div id="clock">Loading...</div>
     </header>
@@ -114,7 +116,7 @@
 </div>
 
 <script>
-/* Annotation Logic remains as per original source */
+/* --- Annotation Logic --- */
 const canvas = document.getElementById("annotateCanvas");
 const ctx = canvas.getContext("2d");
 const toggleDrawBtn = document.getElementById("toggleDrawBtn");
@@ -144,39 +146,26 @@ canvas.addEventListener("pointerdown", e => { if (!drawingEnabled) return; saveS
 canvas.addEventListener("pointermove", e => { if (!drawingEnabled || !drawing) return; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = erasing ? 24 : 5; ctx.strokeStyle = "white"; ctx.lineTo(e.clientX, e.clientY); ctx.stroke(); });
 canvas.addEventListener("pointerup", ()=>{ drawing = false; erasing = false; });
 
-/* Dashboard Logic */
+/* --- Dashboard Logic --- */
 let dayMode = "today";
-const btnToday = document.getElementById("btnToday");
-const btnTomorrow = document.getElementById("btnTomorrow");
-const btnOverview = document.getElementById("btnOverview");
-const weekSelectorWrap = document.getElementById("weekSelectorWrap");
 const weekPicker = document.getElementById("weekPicker");
 const tableWrap = document.getElementById("tableWrap");
-const clockEl = document.getElementById("clock");
-const legendBar = document.getElementById("legendBar");
+window.lastStats = ""; // Global to store weekly count
 
 function getMonday(d) {
-  d = new Date(d); let day = d.getDay();
+  d = new Date(d); 
+  let day = d.getDay();
   let diff = d.getDate() - day + (day == 0 ? -6 : 1);
   return new Date(d.setDate(diff));
 }
 weekPicker.valueAsDate = getMonday(new Date());
 
-// FIXED: Event listener for the date picker to ensure it triggers fetch
-weekPicker.addEventListener('change', () => {
-  if (dayMode === 'overview') fetchBookings();
-});
-
-function updateClock(){ clockEl.textContent = new Date().toLocaleString("en-GB", { timeZone:"Europe/London" }); }
-setInterval(updateClock, 1000); updateClock();
-
-function statusClass(status){
-  status = status.toLowerCase();
-  if (status.includes("ready")) return "ready";
-  if (status.includes("prepar")) return "preparing";
-  if (status.includes("not")) return "notpicked";
-  return "";
+function updateClock(statsHTML = ""){ 
+  document.getElementById("clock").innerHTML = statsHTML + new Date().toLocaleString("en-GB", { timeZone:"Europe/London" }); 
 }
+setInterval(() => {
+  updateClock(dayMode === 'overview' ? (window.lastStats || "") : "");
+}, 1000);
 
 function formatTime(dt) {
   const d = new Date(dt);
@@ -208,46 +197,60 @@ function syncRotatedLayout(){
 
 function switchDay(mode){
   dayMode = mode;
-  btnToday.classList.toggle("selected", mode==="today");
-  btnTomorrow.classList.toggle("selected", mode==="tomorrow");
-  btnOverview.classList.toggle("selected", mode==="overview");
-  weekSelectorWrap.style.display = (mode === "overview") ? "flex" : "none";
-  legendBar.style.display = (mode === "overview") ? "none" : "block";
-  tableWrap.innerHTML = ""; // Clear current view immediately
-  fetchBookings();
-}
-
-async function updateStatus(key,status){
-  await fetch("/api/update-status", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ key, status }) });
-  fetchBookings();
-}
-
-async function setReadyIn(key, minutes){
-  await fetch("/api/ready-in", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ key, minutes }) });
+  window.lastStats = ""; // Clear stats on switch
+  document.getElementById("btnToday").classList.toggle("selected", mode==="today");
+  document.getElementById("btnTomorrow").classList.toggle("selected", mode==="tomorrow");
+  document.getElementById("btnOverview").classList.toggle("selected", mode==="overview");
+  document.getElementById("weekSelectorWrap").style.display = (mode === "overview") ? "flex" : "none";
+  document.getElementById("legendBar").style.display = (mode === "overview") ? "none" : "block";
   fetchBookings();
 }
 
 function renderOverview(list) {
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+  const startMonday = getMonday(new Date(weekPicker.value));
+  
+  // Weekly total in header
+  window.lastStats = `<span class="weekly-stats">Week Total: ${list.length}</span>`;
+  updateClock(window.lastStats);
+
   let html = `<div class="calendar-grid">`;
   days.forEach((dayName, idx) => {
-    const dayNumber = idx + 1;
-    const dayBookings = list.filter(b => new Date(b.startdatetime).getDay() === dayNumber);
+    const columnDate = new Date(startMonday);
+    columnDate.setDate(startMonday.getDate() + idx);
+    const colStr = columnDate.toISOString().split('T')[0];
+    const dateLabel = columnDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
+
+    const dayBookings = list.filter(b => {
+        const bDate = new Date(b.startdatetime);
+        return bDate.toISOString().split('T')[0] === colStr;
+    });
+
     const isAllCollected = dayBookings.length > 0 && dayBookings.every(b => 
       b.statuses && b.statuses.every(st => st.toLowerCase().includes("collected"))
     );
+
     html += `
       <div class="calendar-day ${isAllCollected ? 'collected-day' : ''}">
-        <div class="day-header"><span>${dayName}</span>${isAllCollected ? '<span class="collected-stamp">Collected</span>' : ''}</div>
+        <div class="day-header">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span style="font-size:12px; opacity:0.6;">${dateLabel}</span>
+              <span class="count-badge">${dayBookings.length}</span>
+            </div>
+            <span>${dayName}</span>
+            ${isAllCollected ? '<span class="collected-stamp">Collected</span>' : ''}
+        </div>
         <div class="day-body">
           ${dayBookings.length === 0 ? '<div style="opacity:0.2; font-style:italic; margin-top:10px;">No bookings</div>' : 
-            dayBookings.map(b => `
-              <div class="day-booking-item">
+            dayBookings.map(b => {
+              const collected = b.statuses && b.statuses.every(st => st.toLowerCase().includes("collected"));
+              return `
+              <div class="day-booking-item" style="${collected ? 'opacity:0.4;' : ''}">
                 <div style="font-weight:700; color:#f1c232;">${formatTime(b.startdatetime)}</div>
                 <div style="font-weight:600;">${b.username}</div>
-                <div style="font-size:11px; opacity:0.6;">Status: ${b.status}</div>
-              </div>
-            `).join('')}
+                <div style="font-size:11px; opacity:0.8;">${b.status}</div>
+              </div>`;
+            }).join('')}
         </div>
       </div>`;
   });
@@ -256,63 +259,55 @@ function renderOverview(list) {
   syncRotatedLayout();
 }
 
-function renderTable(list){
-  let html = `<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th><th>Actions</th></tr></thead><tbody>`;
-  if (!list.length) html += `<tr><td colspan="5">No bookings.</td></tr>`;
-  else {
-    for (const b of list){
-      html += `<tr>
-        <td>${formatTime(b.startdatetime)}</td><td>${b.username}</td>
-        <td><span class="status ${statusClass(b.status)}">${b.status}</span></td>
-        <td>${renderAssets(b.assets)}</td>
-        <td>
-          ${b.status==="Not Picked" ? `<button class="btn-preparing" onclick="updateStatus('${b._groupKey}','preparing')">Preparing</button>` : ""}
-          ${b.status==="Preparing" ? `<button class="btn-ready" onclick="updateStatus('${b._groupKey}','ready')">Ready</button>` : ""}
-          <button class="btn-clear" onclick="updateStatus('${b._groupKey}','clear')">Clear</button>
-          <div class="readyin-wrap"><span class="readyin-chip">Ready in <b>${b.readyInMinutes}</b> min</span>
-          <button class="readyin-btn" onclick="setReadyIn('${b._groupKey}', Math.max(0,${b.readyInMinutes}-5))">–5</button>
-          <button class="readyin-btn" onclick="setReadyIn('${b._groupKey}', ${b.readyInMinutes}+5)">+5</button></div>
-        </td></tr>`;
-    }
-  }
-  html += "</tbody></table>"; tableWrap.innerHTML = html; syncRotatedLayout();
-}
-
 async function fetchBookings(){
-  // Construct URL. If overview, explicitly send the date from the picker.
   let url = `/api/bookings-tech?day=${dayMode}`;
-  if (dayMode === "overview") {
-    url = `/api/bookings-tech?day=overview&start=${weekPicker.value}`;
-  }
+  if (dayMode === "overview") url += `&start=${weekPicker.value}`;
 
   try {
     const r = await fetch(url);
     const data = await r.json();
     let list = data.bookings || [];
-    if (dayMode !== "overview") {
+    
+    if (dayMode === "overview") {
+      renderOverview(list);
+    } else {
       list = list.filter(b => !(b.statuses && b.statuses.every(st => st.includes("collected"))));
       list.sort((a,b)=> new Date(a.startdatetime) - new Date(b.startdatetime));
-      renderTable(list);
-    } else {
-      renderOverview(list);
+      
+      let html = `<table><thead><tr><th>Time</th><th>Name</th><th>Status</th><th>Equipment</th><th>Actions</th></tr></thead><tbody>`;
+      if (!list.length) html += `<tr><td colspan="5">No bookings.</td></tr>`;
+      else {
+        for (const b of list){
+          html += `<tr>
+            <td>${formatTime(b.startdatetime)}</td><td>${b.username}</td>
+            <td><span class="status ${b.status.toLowerCase().replace(' ', '')}">${b.status}</span></td>
+            <td>${renderAssets(b.assets)}</td>
+            <td>
+              <button class="btn-clear" onclick="updateStatus('${b._groupKey}','clear')">Clear</button>
+            </td></tr>`;
+        }
+      }
+      html += "</tbody></table>"; 
+      tableWrap.innerHTML = html; 
+      syncRotatedLayout();
     }
   } catch (err) { console.error("Fetch failed", err); }
 }
 
-function enableRotatedWheelScroll(){
-  getScrollWrap().addEventListener("wheel", (e) => {
-    if (drawingEnabled) return;
-    const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-    if (!delta) return;
-    e.preventDefault(); getScrollWrap().scrollLeft += delta;
-  }, { passive:false });
+async function updateStatus(key, status) {
+  await fetch("/api/update-status", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({key, status}) });
+  fetchBookings();
 }
 
-enableRotatedWheelScroll();
+getScrollWrap().addEventListener("wheel", (e) => {
+  if (drawingEnabled) return;
+  const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+  if (delta) { e.preventDefault(); getScrollWrap().scrollLeft += delta; }
+}, { passive:false });
+
 window.addEventListener("resize", syncRotatedLayout);
-setInterval(fetchBookings, 5000);
+setInterval(fetchBookings, 10000);
 fetchBookings();
-syncRotatedLayout();
 </script>
 </body>
 </html>
