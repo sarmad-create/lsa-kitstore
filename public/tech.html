@@ -5,6 +5,7 @@
   <title>Technician Dashboard</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="icon" href="/favicon.ico">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     html, body { margin:0; padding:0; overflow:hidden; height:100%; width:100%; }
@@ -34,7 +35,7 @@
     .status { font-weight:600; padding:6px 12px; border-radius:8px; display:inline-block; }
     .status.notpicked { background:#6b1f1f; color:#ffecec; }
     .status.preparing { background:#6b4d1f; color:#fff8e0; }
-    .status.ready { background:#1e4f2d; color:#ffffff; animation:readyGlow 2.8s ease-in-out infinite alternate; }
+    .status.readyforcollection { background:#1e4f2d; color:#ffffff; animation:readyGlow 2.8s ease-in-out infinite alternate; }
     @keyframes readyGlow { from { transform:scale(1); box-shadow:0 0 0 rgba(0,255,120,0); } to { transform:scale(1.03); box-shadow:0 0 20px rgba(0,255,120,0.4); } }
     .asset-pill { display:inline-block; border-radius:8px; padding:6px 10px; margin:3px 4px 0 0; font-weight:600; }
     .asset-video { background:rgba(128,0,128,0.25); color:#efe8ff; }
@@ -45,12 +46,18 @@
     .top-btn { padding:10px 22px; border-radius:30px; border:2px solid white; cursor:pointer; font-weight:700; background:white; color:black; font-size:16px; transition:.15s; }
     .top-btn.selected { background:#f1c232; border-color:#f1c232; color:black; box-shadow:0 0 10px rgba(255,200,50,0.6); }
     button { border-radius:20px !important; padding:6px 12px; border:0; cursor:pointer; font-weight:700; font-size:14px; }
-    .btn-preparing { background:#f1c232; color:#222; }
-    .btn-ready { background:#1e4f2d; color:#fff; }
-    .btn-clear { background:#777; color:#fff; }
-    #clock { font-size:20px; font-weight:600; opacity:.9; display: flex; align-items: center; }
     
-    /* --- STATS STYLES --- */
+    /* Dynamic Action Button Classes */
+    .btn-action-step { min-width: 160px; text-align: center; }
+    .btn-step-preparing { background:#f1c232; color:#222; }
+    .btn-step-ready { background:#1e4f2d; color:#fff; animation: readyGlow 2s infinite; }
+    .btn-step-clear { background:#777; color:#fff; }
+
+    .readyin-wrap { display:inline-flex; align-items:center; gap:6px; margin-top:8px; }
+    .readyin-chip { font-size:12px; background:rgba(255,255,255,0.08); padding:4px 8px; border-radius:25px; }
+    .readyin-btn { padding:6px 12px; border-radius:25px; background:#333; color:#fff; font-weight:700; }
+    
+    #clock { font-size:20px; font-weight:600; opacity:.9; display: flex; align-items: center; }
     .count-badge { background: #f1c232; color: #000; padding: 2px 8px; border-radius: 12px; font-size: 14px; font-weight: 800; }
     .weekly-stats { font-size: 16px; font-weight: 700; background: rgba(255,255,255,0.1); padding: 8px 15px; border-radius: 20px; margin-right: 15px; color: #f1c232; }
 
@@ -60,15 +67,16 @@
     #annotateToolsInner { transform: rotate(-90deg); transform-origin: top right; display:flex; flex-direction:column; gap:8px; pointer-events:auto; }
     .tool-btn { background:rgba(255,255,255,0.35); border-radius:24px; padding:8px 16px; font-weight:700; border:1px solid rgba(255,255,255,0.4); font-size:14px; color:black; cursor:pointer; backdrop-filter: blur(4px); }
 
-    /* --- OVERVIEW TAB STYLES --- */
-    #weekSelectorWrap { display: none; align-items: center; gap: 10px; background: rgba(255,255,255,0.1); padding: 5px 15px; border-radius: 30px; }
-    #weekPicker { background: transparent; border: none; color: white; font-family: inherit; font-size: 16px; color-scheme: dark; cursor: pointer; }
+    #weekSelectorWrap, #utilYearWrap { display: none; align-items: center; gap: 10px; background: rgba(255,255,255,0.1); padding: 5px 15px; border-radius: 30px; }
+    #weekPicker, #yearPicker { background: transparent; border: none; color: white; font-family: inherit; font-size: 16px; color-scheme: dark; cursor: pointer; outline: none; }
     .calendar-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 10px; }
     .calendar-day { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px; min-height: 400px; }
     .calendar-day.collected-day { border-color: #1e4f2d; background: rgba(30, 79, 45, 0.2); }
     .day-header { font-size: 16px; font-weight: 800; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; display: flex; flex-direction: column; }
     .day-booking-item { font-size: 13px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
     .collected-stamp { color: #5cff89; font-weight: 900; font-size: 10px; text-transform: uppercase; background: rgba(92, 255, 137, 0.15); padding: 2px 6px; border-radius: 4px; letter-spacing: 0.5px; width: fit-content; margin-top: 4px; }
+    
+    #utilContainer { max-width: 900px; margin: 20px auto; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 20px; height: 500px; }
   </style>
 </head>
 <body>
@@ -90,11 +98,18 @@
       <div style="display:flex; align-items:center; gap:20px;">
         <h1>Technician Dashboard</h1>
         <div style="display:flex; gap:12px;">
+          <button id="btnUtil" onclick="switchDay('utilisation')" class="top-btn">Utilisation</button>
           <button id="btnOverview" onclick="switchDay('overview')" class="top-btn">Overview</button>
           <button id="btnToday" onclick="switchDay('today')" class="top-btn selected">Today</button>
           <button id="btnTomorrow" onclick="switchDay('tomorrow')" class="top-btn">Tomorrow</button>
         </div>
       </div>
+      
+      <div id="utilYearWrap">
+        <span style="font-size:13px; font-weight:800;">ACADEMIC YEAR:</span>
+        <select id="yearPicker" onchange="fetchUtilisation()"></select>
+      </div>
+
       <div id="weekSelectorWrap">
         <span style="font-size:13px; font-weight:800;">WEEK COMMENCING:</span>
         <input type="date" id="weekPicker" onchange="fetchBookings()">
@@ -150,7 +165,20 @@ canvas.addEventListener("pointerup", ()=>{ drawing = false; erasing = false; });
 let dayMode = "today";
 const weekPicker = document.getElementById("weekPicker");
 const tableWrap = document.getElementById("tableWrap");
-window.lastStats = ""; // Global to store weekly count
+window.lastStats = ""; 
+let currentChart = null;
+
+function initYearPicker() {
+    const sel = document.getElementById('yearPicker');
+    const now = new Date();
+    const currentYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+    for (let y = currentYear; y >= 2019; y--) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = `Sept ${y} - July ${y+1}`;
+        sel.appendChild(opt);
+    }
+}
 
 function getMonday(d) {
   d = new Date(d); 
@@ -197,20 +225,66 @@ function syncRotatedLayout(){
 
 function switchDay(mode){
   dayMode = mode;
-  window.lastStats = ""; // Clear stats on switch
+  window.lastStats = ""; 
+  document.getElementById("btnUtil").classList.toggle("selected", mode==="utilisation");
   document.getElementById("btnToday").classList.toggle("selected", mode==="today");
   document.getElementById("btnTomorrow").classList.toggle("selected", mode==="tomorrow");
   document.getElementById("btnOverview").classList.toggle("selected", mode==="overview");
+  
   document.getElementById("weekSelectorWrap").style.display = (mode === "overview") ? "flex" : "none";
-  document.getElementById("legendBar").style.display = (mode === "overview") ? "none" : "block";
-  fetchBookings();
+  document.getElementById("utilYearWrap").style.display = (mode === "utilisation") ? "flex" : "none";
+  document.getElementById("legendBar").style.display = (mode === "overview" || mode === "utilisation") ? "none" : "block";
+
+  if (mode === "utilisation") {
+    fetchUtilisation();
+  } else {
+    fetchBookings();
+  }
+}
+
+async function fetchUtilisation() {
+  const year = document.getElementById('yearPicker').value;
+  tableWrap.innerHTML = '<div id="utilContainer"><canvas id="utilChart"></canvas></div>';
+  try {
+    const r = await fetch(`/api/utilisation?year=${year}`);
+    const data = await r.json();
+    if (!data.success) return;
+
+    const ctxChart = document.getElementById('utilChart').getContext('2d');
+    if (currentChart) currentChart.destroy();
+    
+    currentChart = new Chart(ctxChart, {
+      type: 'bar',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          label: 'Total Bookings',
+          data: data.counts,
+          backgroundColor: '#f1c232',
+          borderRadius: 8,
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          title: { display: true, text: 'Academic Year Volume (All Bookings)', color: '#f0e6ff', font: { size: 18 } }
+        },
+        scales: {
+            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#f0e6ff' } },
+            x: { grid: { display: false }, ticks: { color: '#f0e6ff' } }
+        }
+      }
+    });
+    syncRotatedLayout();
+  } catch (err) { console.error("Utilisation fetch failed", err); }
 }
 
 function renderOverview(list) {
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const startMonday = getMonday(new Date(weekPicker.value));
-  
-  // Weekly total in header
   window.lastStats = `<span class="weekly-stats">Week Total: ${list.length}</span>`;
   updateClock(window.lastStats);
 
@@ -278,12 +352,43 @@ async function fetchBookings(){
       if (!list.length) html += `<tr><td colspan="5">No bookings.</td></tr>`;
       else {
         for (const b of list){
+          const statusClass = b.status.toLowerCase().replace(/\s/g, '');
+          
+          /* Step-based action button logic */
+          let actionLabel = "";
+          let actionClass = "";
+          let nextState = "";
+
+          if (b.status === "Not Picked") {
+            actionLabel = "Preparing";
+            actionClass = "btn-step-preparing";
+            nextState = "preparing";
+          } else if (b.status === "Preparing") {
+            actionLabel = "Ready for Collection";
+            actionClass = "btn-step-ready";
+            nextState = "ready";
+          } else {
+            actionLabel = "Clear";
+            actionClass = "btn-step-clear";
+            nextState = "clear";
+          }
+
           html += `<tr>
-            <td>${formatTime(b.startdatetime)}</td><td>${b.username}</td>
-            <td><span class="status ${b.status.toLowerCase().replace(' ', '')}">${b.status}</span></td>
+            <td>${formatTime(b.startdatetime)}</td>
+            <td>${b.username}</td>
+            <td>
+              <span class="status ${statusClass}">${b.status}</span>
+              <div class="readyin-wrap">
+                <span class="readyin-chip">Ready in <b>${b.readyInMinutes}</b> min</span>
+                <button class="readyin-btn" onclick="setReadyIn('${b._groupKey}', Math.max(0,${b.readyInMinutes}-5))">–5</button>
+                <button class="readyin-btn" onclick="setReadyIn('${b._groupKey}', ${b.readyInMinutes}+5)">+5</button>
+              </div>
+            </td>
             <td>${renderAssets(b.assets)}</td>
             <td>
-              <button class="btn-clear" onclick="updateStatus('${b._groupKey}','clear')">Clear</button>
+              <button class="btn-action-step ${actionClass}" onclick="updateStatus('${b._groupKey}','${nextState}')">
+                ${actionLabel}
+              </button>
             </td></tr>`;
         }
       }
@@ -299,6 +404,11 @@ async function updateStatus(key, status) {
   fetchBookings();
 }
 
+async function setReadyIn(key, minutes) {
+  await fetch("/api/ready-in", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({key, minutes}) });
+  fetchBookings();
+}
+
 getScrollWrap().addEventListener("wheel", (e) => {
   if (drawingEnabled) return;
   const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
@@ -306,7 +416,10 @@ getScrollWrap().addEventListener("wheel", (e) => {
 }, { passive:false });
 
 window.addEventListener("resize", syncRotatedLayout);
-setInterval(fetchBookings, 10000);
+initYearPicker();
+setInterval(() => {
+    if (dayMode !== "utilisation") fetchBookings();
+}, 10000);
 fetchBookings();
 </script>
 </body>

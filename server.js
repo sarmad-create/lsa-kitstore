@@ -12,10 +12,8 @@ app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
 
-/* 1. SERVE STATIC FILES */
 app.use(express.static(path.join(__dirname, 'public')));
 
-/* ===== ENV ===== */
 const BASE_URL = process.env.SISO_BASE_URL || 'https://lsa.siso.co';
 const AUTH_TOKEN = process.env.SISO_AUTH_TOKEN;
 const AUTH_KEY = process.env.SISO_AUTH_KEY;
@@ -25,7 +23,6 @@ if (!AUTH_TOKEN || !AUTH_KEY) {
   process.exit(1);
 }
 
-/* ===== JSON FILE HELPERS ===== */
 const STATUS_FILE = path.join(__dirname, 'statuses.json');
 const READYIN_FILE = path.join(__dirname, 'readyin.json');
 const LISTS_FILE = path.join(__dirname, 'lists.json');
@@ -47,9 +44,7 @@ async function readStatuses() { return readJson(STATUS_FILE, {}); }
 async function readReadyIn() { return readJson(READYIN_FILE, {}); }
 async function readLists() { return readJson(LISTS_FILE, { video: [], sound: [], lighting: [], grip: [] }); }
 
-/* ===== JWT CACHE ===== */
 let cachedJwt = null, jwtExpiry = 0;
-
 async function getJwt() {
   if (cachedJwt && Date.now() < jwtExpiry - 3000) return cachedJwt;
   const res = await axios.post(`${BASE_URL}/scripts/api/v1/jwt_request`, {}, {
@@ -61,17 +56,12 @@ async function getJwt() {
   return token;
 }
 
-/* ===== UTC DATE HELPERS ===== */
-function getUTCDateOnly(d) {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-}
+function getUTCDateOnly(d) { return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); }
 function isSameUTCDate(dateStr, utcDay) {
   const d = new Date(dateStr);
-  const stripped = getUTCDateOnly(d);
-  return stripped.getTime() === utcDay.getTime();
+  return getUTCDateOnly(d).getTime() === utcDay.getTime();
 }
 
-/* ===== CATEGORY HELPERS ===== */
 function getTimeBucket(dt, minutes = 5) {
   const d = new Date(dt);
   return new Date(Math.floor(d.getTime() / (minutes * 60000)) * (minutes * 60000)).toISOString();
@@ -87,17 +77,75 @@ function categoryFromLists(name, lists) {
   return "uncategorised";
 }
 
-/* ===== ROUTES — PAGES ===== */
 app.get(["/", "/index.html", "/home"], (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 app.get(["/today", "/today.html"], (req, res) => res.sendFile(path.join(__dirname, "public", "today.html")));
 app.get(["/teachers", "/teachers.html"], (req, res) => res.sendFile(path.join(__dirname, "public", "teachers.html")));
 app.get(["/calendar", "/calendar.html"], (req, res) => res.sendFile(path.join(__dirname, "public", "calendar.html")));
-
 const TECH_PATH = "/tech-94f02c77b8c149e8bb3b0f72d8f93fa2";
 app.get(['/tech', '/tech.html'], (req, res) => res.redirect(302, TECH_PATH));
 app.get(TECH_PATH, (req, res) => res.sendFile(path.join(__dirname, "public", "tech.html")));
 
-/* ===== API: TECH DASHBOARD (WITH OVERVIEW & COUNTS) ===== */
+/* ============================================================
+   API: UTILISATION DATA (Matching Smarthub Report Totals)
+============================================================ */
+app.get("/api/utilisation", async (req, res) => {
+  try {
+    const selectedYear = parseInt(req.query.year) || new Date().getFullYear();
+    const jwt = await getJwt();
+    
+    // Sept to Aug sequence
+    const monthSequence = [
+      { m: 8, y: selectedYear }, { m: 9, y: selectedYear }, { m: 10, y: selectedYear }, { m: 11, y: selectedYear },
+      { m: 0, y: selectedYear + 1 }, { m: 1, y: selectedYear + 1 }, { m: 2, y: selectedYear + 1 }, { m: 3, y: selectedYear + 1 },
+      { m: 4, y: selectedYear + 1 }, { m: 5, y: selectedYear + 1 }, { m: 6, y: selectedYear + 1 }, { m: 7, y: selectedYear + 1 }
+    ];
+
+    const labels = [];
+    const counts = [];
+
+    for (const item of monthSequence) {
+      const firstDay = new Date(Date.UTC(item.y, item.m, 1));
+      const lastDay = new Date(Date.UTC(item.y, item.m + 1, 0));
+      
+      // FIX: Using ISO format (YYYY-MM-DD) which is more reliable for the API backend
+      const dateFrom = firstDay.toISOString().split('T')[0];
+      const dateTo = lastDay.toISOString().split('T')[0];
+
+      let monthTotal = 0;
+
+      try {
+        const { data } = await axios.post(`${BASE_URL}/scripts/api/v1/report`, {
+          report_uuid: "b497f2d6-5dbb-44a2-83a1-d5ad69e9b047",
+          filters: [{ arg: "DATEFROMTO", value: `${dateFrom},${dateTo}` }]
+        }, {
+          headers: { Accept: "application/json", Authorization: `Bearer ${jwt}` },
+          timeout: 20000 
+        });
+
+        const rows = data?.response?.rows || data?.response?.results || [];
+        
+        // Match the "Finished" row count seen in Smarthub
+        const finishedRows = rows.filter(r => {
+            const status = String(r.status || r.currentstatus || "").toLowerCase();
+            return status.includes("finished") || status.includes("restocked") || status.includes("returned");
+        });
+
+        monthTotal = finishedRows.length;
+      } catch (err) {
+        console.error(`Error in month ${item.m}:`, err.message);
+      }
+
+      labels.push(firstDay.toLocaleString('en-GB', { month: 'short' }));
+      counts.push(monthTotal);
+    }
+
+    res.json({ success: true, labels, counts });
+  } catch (e) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
+/* ===== API: TECH DASHBOARD ===== */
 app.get("/api/bookings-tech", async (req, res) => {
   try {
     const mode = req.query.day || "today";
@@ -127,7 +175,6 @@ app.get("/api/bookings-tech", async (req, res) => {
     }
 
     let expanded = await expandBookings(filteredRows);
-
     if (mode !== "overview") {
       expanded = expanded.filter(b => !(b.statuses && b.statuses.every(st => st.includes("collected"))));
     }
@@ -138,7 +185,6 @@ app.get("/api/bookings-tech", async (req, res) => {
   }
 });
 
-/* ===== EXPAND BOOKINGS ===== */
 async function expandBookings(rows) {
   const lists = await readLists();
   const statuses = await readStatuses();
